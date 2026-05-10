@@ -7,10 +7,15 @@ mock.module("@ai-sdk/openai", () => ({
     const source = settings.baseURL
       ? `openai:${settings.baseURL}`
       : "openai:default";
+    const chat = (modelId: string) => {
+      providerCalls.push({ modelId, source: `${source}:chat` });
+      return { modelId };
+    };
     const call = (modelId: string) => {
       providerCalls.push({ modelId, source });
       return { modelId };
     };
+    call.chat = chat;
     return call;
   },
 }));
@@ -25,7 +30,7 @@ describe("gateway", () => {
     expect(providerCalls).toEqual([
       {
         modelId: "anthropic/claude-sonnet-4.6",
-        source: "openai:https://models.github.ai/inference",
+        source: "openai:https://models.github.ai/inference:chat",
       },
     ]);
   });
@@ -51,7 +56,7 @@ describe("gateway", () => {
     expect(providerCalls).toEqual([
       {
         modelId: "openai/gpt-5.4",
-        source: "openai:https://models.github.ai/inference",
+        source: "openai:https://models.github.ai/inference:chat",
       },
     ]);
   });

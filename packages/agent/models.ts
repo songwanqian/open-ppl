@@ -27,7 +27,7 @@ export function gateway(
     return customProvider(modelId);
   }
 
-  return githubProvider(modelId);
+  return githubProvider.chat(modelId);
 }
 
 export type { LanguageModel };

@@ -290,7 +290,9 @@ export function stripProviderPrefix(label: string, provider: string): string {
   if (!prefixes) return label;
   for (const prefix of prefixes) {
     if (label.startsWith(prefix + " ")) {
-      return label.slice(prefix.length + 1);
+      const stripped = label.slice(prefix.length + 1);
+      if (stripped.length < 3) return label;
+      return stripped;
     }
   }
   return label;
