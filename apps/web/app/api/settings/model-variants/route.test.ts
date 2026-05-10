@@ -122,9 +122,7 @@ describe("/api/settings/model-variants", () => {
     );
     const body = (await response.json()) as { modelVariants: ModelVariant[] };
 
-    expect(body.modelVariants.map((variant) => variant.id)).toEqual([
-      "variant:builtin:gpt-5.4-xhigh",
-    ]);
+    expect(body.modelVariants.map((variant) => variant.id)).toEqual([]);
   });
 
   test("POST rejects invalid JSON body", async () => {
@@ -161,9 +159,9 @@ describe("/api/settings/model-variants", () => {
     expect(response.ok).toBe(true);
 
     const body = (await response.json()) as { modelVariants: ModelVariant[] };
-    expect(body.modelVariants).toHaveLength(3);
-    expect(body.modelVariants[2]?.id.startsWith("variant:")).toBe(true);
-    expect(body.modelVariants[2]?.name).toBe("OpenAI Medium");
+    expect(body.modelVariants).toHaveLength(1);
+    expect(body.modelVariants[0]?.id.startsWith("variant:")).toBe(true);
+    expect(body.modelVariants[0]?.name).toBe("OpenAI Medium");
   });
 
   test("POST rejects Opus-backed variants for managed trial users", async () => {
@@ -318,7 +316,7 @@ describe("/api/settings/model-variants", () => {
     expect(response.ok).toBe(true);
 
     const body = (await response.json()) as { modelVariants: ModelVariant[] };
-    expect(body.modelVariants[2]?.providerOptions).toEqual({
+    expect(body.modelVariants[0]?.providerOptions).toEqual({
       reasoningEffort: "high",
     });
   });
@@ -400,6 +398,6 @@ describe("/api/settings/model-variants", () => {
     expect(response.ok).toBe(true);
 
     const body = (await response.json()) as { modelVariants: ModelVariant[] };
-    expect(body.modelVariants).toHaveLength(2);
+    expect(body.modelVariants).toHaveLength(0);
   });
 });

@@ -2,23 +2,13 @@ import { describe, expect, mock, test } from "bun:test";
 
 const providerCalls: Array<{ modelId: string; source: string }> = [];
 
-mock.module("@github/models", () => ({
-  createGitHubModels: () => {
-    const call = (modelId: string) => {
-      providerCalls.push({ modelId, source: "github" });
-      return { modelId };
-    };
-    return call;
-  },
-}));
-
 mock.module("@ai-sdk/openai", () => ({
   createOpenAI: (settings: Record<string, unknown>) => {
+    const source = settings.baseURL
+      ? `openai:${settings.baseURL}`
+      : "openai:default";
     const call = (modelId: string) => {
-      providerCalls.push({
-        modelId,
-        source: `custom:${settings.baseURL}`,
-      });
+      providerCalls.push({ modelId, source });
       return { modelId };
     };
     return call;
@@ -33,7 +23,10 @@ describe("gateway", () => {
     gateway("anthropic/claude-sonnet-4.6");
 
     expect(providerCalls).toEqual([
-      { modelId: "anthropic/claude-sonnet-4.6", source: "github" },
+      {
+        modelId: "anthropic/claude-sonnet-4.6",
+        source: "openai:https://models.github.ai/inference",
+      },
     ]);
   });
 
@@ -46,7 +39,7 @@ describe("gateway", () => {
     expect(providerCalls).toEqual([
       {
         modelId: "anthropic/claude-sonnet-4.6",
-        source: "custom:https://custom.api",
+        source: "openai:https://custom.api",
       },
     ]);
   });
@@ -56,7 +49,10 @@ describe("gateway", () => {
     gateway("openai/gpt-5.4");
 
     expect(providerCalls).toEqual([
-      { modelId: "openai/gpt-5.4", source: "github" },
+      {
+        modelId: "openai/gpt-5.4",
+        source: "openai:https://models.github.ai/inference",
+      },
     ]);
   });
 });

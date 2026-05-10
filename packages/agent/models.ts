@@ -1,4 +1,3 @@
-import { createGitHubModels } from "@github/models";
 import { createOpenAI } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
 
@@ -11,7 +10,10 @@ export interface GatewayOptions {
   config?: GatewayConfig;
 }
 
-const githubProvider = createGitHubModels();
+const githubProvider = createOpenAI({
+  baseURL: "https://models.github.ai/inference",
+  apiKey: process.env.GITHUB_TOKEN,
+});
 
 export function gateway(
   modelId: string,

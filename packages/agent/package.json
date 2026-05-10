@@ -13,7 +13,6 @@
   "dependencies": {
     "@ai-sdk/anthropic": "catalog:",
     "@ai-sdk/openai": "catalog:",
-    "@github/models": "^0.0.1-beta.2",
     "@open-agents/sandbox": "workspace:*",
     "ai": "catalog:",
     "zod": "catalog:"

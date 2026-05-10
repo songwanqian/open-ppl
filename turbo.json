@@ -19,6 +19,7 @@
         "POSTGRES_URL",
         "REDIS_URL",
         "VERCEL_APP_CLIENT_SECRET",
+        "OPEN_AGENTS_RESOURCE_PROFILE",
         "GITHUB_TOKEN"
       ],
       "outputs": ["dist/**"]
