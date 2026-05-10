@@ -2,11 +2,7 @@ import type { SandboxState } from "@open-agents/sandbox";
 import { stepCountIs, ToolLoopAgent, type ToolSet } from "ai";
 import { z } from "zod";
 import { addCacheControl } from "./context-management";
-import {
-  type GatewayModelId,
-  gateway,
-  type ProviderOptionsByProvider,
-} from "./models";
+import { gateway } from "./models";
 
 import type { SkillMetadata } from "./skills/types";
 import { buildSystemPrompt } from "./system-prompt";
@@ -25,11 +21,10 @@ import {
 } from "./tools";
 
 export interface AgentModelSelection {
-  id: GatewayModelId;
-  providerOptionsOverrides?: ProviderOptionsByProvider;
+  id: string;
 }
 
-export type OpenAgentModelInput = GatewayModelId | AgentModelSelection;
+export type OpenAgentModelInput = string | AgentModelSelection;
 
 export interface AgentSandboxContext {
   state: SandboxState;
@@ -53,7 +48,7 @@ export const defaultModel = gateway(defaultModelLabel);
 
 function normalizeAgentModelSelection(
   selection: OpenAgentModelInput | undefined,
-  fallbackId: GatewayModelId,
+  fallbackId: string,
 ): AgentModelSelection {
   if (!selection) {
     return { id: fallbackId };
@@ -103,13 +98,9 @@ export const openAgent = new ToolLoopAgent({
       ? normalizeAgentModelSelection(options.subagentModel, defaultModelLabel)
       : undefined;
 
-    const callModel = gateway(mainSelection.id, {
-      providerOptionsOverrides: mainSelection.providerOptionsOverrides,
-    });
+    const callModel = gateway(mainSelection.id);
     const subagentModel = subagentSelection
-      ? gateway(subagentSelection.id, {
-          providerOptionsOverrides: subagentSelection.providerOptionsOverrides,
-        })
+      ? gateway(subagentSelection.id)
       : undefined;
     const customInstructions = options.customInstructions;
     const sandbox = options.sandbox;

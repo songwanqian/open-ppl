@@ -21,7 +21,7 @@ export function resolveChatModelSelection({
     console.warn(
       `${missingVariantLabel} "${requestedModelId}" was not found. Falling back to default model.`,
     );
-    return { id: APP_DEFAULT_MODEL_ID as AgentModelSelection["id"] };
+    return { id: APP_DEFAULT_MODEL_ID };
   }
 
   const availableModelId = resolveAvailableModelId(selection.resolvedModelId);
@@ -29,15 +29,10 @@ export function resolveChatModelSelection({
     console.warn(
       `${missingVariantLabel} "${requestedModelId}" resolves to disabled model "${selection.resolvedModelId}". Falling back to default model.`,
     );
-    return { id: APP_DEFAULT_MODEL_ID as AgentModelSelection["id"] };
+    return { id: APP_DEFAULT_MODEL_ID };
   }
 
   return {
-    id: availableModelId as AgentModelSelection["id"],
-    ...(selection.providerOptionsByProvider
-      ? {
-          providerOptionsOverrides: selection.providerOptionsByProvider,
-        }
-      : {}),
+    id: availableModelId,
   };
 }

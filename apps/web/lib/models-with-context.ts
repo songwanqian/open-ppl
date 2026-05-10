@@ -1,6 +1,5 @@
 import "server-only";
 
-import { gateway } from "ai";
 import { z } from "zod";
 import { filterDisabledModels } from "./model-availability";
 import type {
@@ -12,6 +11,7 @@ import type {
 
 const MODELS_DEV_URL = "https://models.dev/api.json";
 const MODELS_DEV_TIMEOUT_MS = 750;
+const GITHUB_MODELS_CATALOG_URL = "https://models.github.ai/catalog/models";
 
 type GatewayModel = GatewayAvailableModel;
 
@@ -22,53 +22,17 @@ interface ModelsDevMetadata {
 
 const recordSchema = z.object({}).catchall(z.unknown());
 
-const gatewayModelSchema = z
-  .object({
-    id: z.string(),
-    name: z.string(),
-    description: z.string().nullish(),
-    modelType: z.string().nullish(),
-  })
-  .passthrough();
-
-const gatewayErrorSchema = z.object({
-  response: z.object({
-    models: z.array(z.unknown()),
-  }),
-});
-
-const modelsDevLimitSchema = z
-  .object({
-    context: z.number().finite().positive().optional(),
-  })
-  .passthrough();
-
-const modelsDevCostTierSchema = z
-  .object({
-    input: z.number().finite().optional(),
-    output: z.number().finite().optional(),
-    cache_read: z.number().finite().optional(),
-  })
-  .passthrough();
-
-function getModelsFromGatewayError(error: unknown): GatewayModel[] | undefined {
-  const parsed = gatewayErrorSchema.safeParse(error);
-  if (!parsed.success) {
-    return undefined;
-  }
-
-  const models = parsed.data.response.models.flatMap((model) => {
-    const parsedModel = gatewayModelSchema.safeParse(model);
-    return parsedModel.success ? [parsedModel.data] : [];
-  });
-
-  return models.length > 0 ? models : undefined;
-}
-
 function getModelsDevCostTier(
   value: unknown,
 ): AvailableModelCostTier | undefined {
-  const parsed = modelsDevCostTierSchema.safeParse(value);
+  const parsed = z
+    .object({
+      input: z.number().finite().optional(),
+      output: z.number().finite().optional(),
+      cache_read: z.number().finite().optional(),
+    })
+    .passthrough()
+    .safeParse(value);
   if (!parsed.success) {
     return undefined;
   }
@@ -134,7 +98,12 @@ function getModelsDevMetadataMap(
       const rawId = parsedId.success ? parsedId.data : modelKey;
       const modelId = rawId.includes("/") ? rawId : `${providerKey}/${rawId}`;
 
-      const parsedLimit = modelsDevLimitSchema.safeParse(model.data.limit);
+      const parsedLimit = z
+        .object({
+          context: z.number().finite().positive().optional(),
+        })
+        .passthrough()
+        .safeParse(model.data.limit);
       const contextWindow = parsedLimit.success
         ? parsedLimit.data.context
         : undefined;
@@ -201,24 +170,58 @@ function addModelsDevMetadata(
   return nextModel;
 }
 
-async function fetchGatewayModels(): Promise<GatewayModel[]> {
-  try {
-    const { models } = await gateway.getAvailableModels();
-    return models;
-  } catch (error) {
-    const models = getModelsFromGatewayError(error);
-    if (models) {
-      return models;
-    }
-
-    throw error;
+async function fetchGitHubModelsCatalog(): Promise<GatewayModel[]> {
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) {
+    throw new Error(
+      "GITHUB_TOKEN environment variable is required for GitHub Models",
+    );
   }
+
+  const response = await fetch(GITHUB_MODELS_CATALOG_URL, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${token}`,
+      "X-GitHub-Api-Version": "2025-04-01",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch GitHub Models catalog: ${response.status}`,
+    );
+  }
+
+  const data: unknown = await response.json();
+
+  const catalogSchema = z.array(
+    z
+      .object({
+        id: z.string(),
+        name: z.string().optional(),
+        description: z.string().optional(),
+        task: z.union([z.string(), z.array(z.string())]).optional(),
+      })
+      .passthrough(),
+  );
+
+  const parsed = catalogSchema.safeParse(data);
+  if (!parsed.success) {
+    throw new Error("Invalid GitHub Models catalog response");
+  }
+
+  return parsed.data.map((model) => ({
+    id: model.id,
+    name: model.name ?? model.id,
+    description: model.description ?? null,
+    modelType: "language" as const,
+  }));
 }
 
 export async function fetchAvailableLanguageModels(): Promise<
   AvailableModel[]
 > {
-  const models = await fetchGatewayModels();
+  const models = await fetchGitHubModelsCatalog();
   return filterDisabledModels(
     models.filter((model) => model.modelType === "language"),
   );

@@ -1,4 +1,5 @@
 export { type GatewayConfig, type GatewayOptions, gateway } from "./models";
+export type { LanguageModel } from "./models";
 export type {
   AgentModelSelection,
   AgentSandboxContext,

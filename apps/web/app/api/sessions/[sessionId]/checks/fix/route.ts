@@ -6,7 +6,8 @@ import type { CheckRun } from "@/lib/github/pulls";
 import { getUserGitHubToken } from "@/lib/github/token";
 import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 import { Octokit } from "@octokit/rest";
-import { gateway, generateText } from "ai";
+import { gateway } from "@open-agents/agent";
+import { generateText } from "ai";
 
 type RouteContext = {
   params: Promise<{ sessionId: string }>;
