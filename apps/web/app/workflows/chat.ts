@@ -56,6 +56,7 @@ import type {
 } from "@/lib/db/workflow-runs";
 import { resolveChatModelSelectionWithGateway } from "../api/chat/_lib/model-selection";
 import { resolveChatSandboxRuntime } from "./chat-sandbox-runtime";
+import { runSearchWorkflowTurn } from "./search";
 
 function isSandboxExecError(
   error: unknown,
@@ -244,6 +245,18 @@ const generateId = async () => {
   "use step";
   return generateIdAi();
 };
+
+async function resolveWorkflowSessionMode(sessionId: string, userId: string) {
+  "use step";
+  const sessionRecord = await getSessionById(sessionId);
+  if (!sessionRecord) {
+    throw new Error("Session not found");
+  }
+  if (sessionRecord.userId !== userId) {
+    throw new Error("Unauthorized");
+  }
+  return sessionRecord.mode;
+}
 
 async function persistInputMessages(
   chatId: string,
@@ -650,6 +663,25 @@ export async function runAgentWorkflow(options: Options) {
     // Exit before emitting chunks or persisting messages so only the owning
     // workflow can mutate this chat.
     await closeStream(writable);
+    return;
+  }
+
+  const sessionMode = await resolveWorkflowSessionMode(
+    options.sessionId,
+    options.userId,
+  );
+  if (sessionMode === "search") {
+    await runSearchWorkflowTurn({
+      messages: options.messages,
+      chatId: options.chatId,
+      sessionId: options.sessionId,
+      userId: options.userId,
+      requestUrl: options.requestUrl,
+      authSession: options.authSession,
+      maxSteps: options.maxSteps,
+      workflowRunId,
+      writable,
+    });
     return;
   }
 

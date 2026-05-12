@@ -122,6 +122,7 @@ export default async function RepoPage({ params }: RepoPageProps) {
       id: nanoid(),
       userId: session.user.id,
       title,
+      mode: "computer",
       status: "running",
       repoOwner: username,
       repoName: repo,

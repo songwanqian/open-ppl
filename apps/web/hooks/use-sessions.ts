@@ -11,6 +11,7 @@ export type SessionWithUnread = Pick<
   Session,
   | "id"
   | "title"
+  | "mode"
   | "status"
   | "repoOwner"
   | "repoName"
@@ -29,6 +30,7 @@ export type SessionWithUnread = Pick<
 
 interface CreateSessionInput {
   title?: string;
+  mode?: "computer" | "search";
   repoOwner?: string;
   repoName?: string;
   branch?: string;
@@ -71,6 +73,7 @@ function mergeSessionWithSummary(
     id: updatedSession.id,
     title: updatedSession.title,
     status: updatedSession.status,
+    mode: updatedSession.mode,
     repoOwner: updatedSession.repoOwner,
     repoName: updatedSession.repoName,
     branch: updatedSession.branch,

@@ -38,6 +38,7 @@ export function SessionHeader() {
     headerActionsRef,
   } = useGitPanel();
   const { session } = useSessionLayout();
+  const isComputerMode = session.mode === "computer";
 
   // Determine the icon and color based on PR state
   const prState = useMemo(() => {
@@ -77,6 +78,10 @@ export function SessionHeader() {
   }, [session.prNumber, session.prStatus, changesCount, hasActionNeeded]);
 
   const openGitPanel = useCallback(() => {
+    if (!isComputerMode) {
+      return;
+    }
+
     const defaultTab = session.prNumber
       ? "pr"
       : hasActionNeeded || hasCommittedChanges || changesCount > 0
@@ -87,6 +92,7 @@ export function SessionHeader() {
     setGitPanelOpen(true);
   }, [
     session.prNumber,
+    isComputerMode,
     hasActionNeeded,
     hasCommittedChanges,
     changesCount,
@@ -114,6 +120,9 @@ export function SessionHeader() {
       if (!isGitPanelShortcut || event.repeat) {
         return;
       }
+      if (!isComputerMode) {
+        return;
+      }
 
       event.preventDefault();
       handleGitPanelToggle();
@@ -121,7 +130,7 @@ export function SessionHeader() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleGitPanelToggle]);
+  }, [handleGitPanelToggle, isComputerMode]);
 
   return (
     <header className="border-b border-border px-3 py-1.5">
@@ -172,6 +181,11 @@ export function SessionHeader() {
                 <span className="text-muted-foreground/40">/</span>
               </div>
             )}
+            {session.mode === "search" && (
+              <span className="hidden rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground sm:inline-flex">
+                Search
+              </span>
+            )}
             <span className="truncate font-medium text-foreground sm:font-normal sm:text-muted-foreground">
               {session.title}
             </span>
@@ -197,32 +211,34 @@ export function SessionHeader() {
           {/* Portal target for dev server / code editor buttons (rendered from per-chat content) */}
           <div ref={headerActionsRef} className="flex items-center" />
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn(
-                  "relative h-7 w-7 shrink-0",
-                  gitPanelOpen && "bg-accent text-accent-foreground",
-                )}
-                onClick={handleGitPanelToggle}
-              >
-                <GitIcon
-                  className={cn("h-4 w-4", !gitPanelOpen && iconColor)}
-                />
-                {!gitPanelOpen && hasActionNeeded && (
-                  <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-amber-500" />
-                )}
-                {!gitPanelOpen && !hasActionNeeded && hasCommittedChanges && (
-                  <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-blue-500" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {`${tooltipText} · ⌘⇧B / Ctrl+Shift+B`}
-            </TooltipContent>
-          </Tooltip>
+          {isComputerMode && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "relative h-7 w-7 shrink-0",
+                    gitPanelOpen && "bg-accent text-accent-foreground",
+                  )}
+                  onClick={handleGitPanelToggle}
+                >
+                  <GitIcon
+                    className={cn("h-4 w-4", !gitPanelOpen && iconColor)}
+                  />
+                  {!gitPanelOpen && hasActionNeeded && (
+                    <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-amber-500" />
+                  )}
+                  {!gitPanelOpen && !hasActionNeeded && hasCommittedChanges && (
+                    <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-blue-500" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {`${tooltipText} · ⌘⇧B / Ctrl+Shift+B`}
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
       </div>
     </header>

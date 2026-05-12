@@ -182,6 +182,7 @@ export function SessionsRouteShell({
     async (repoOwner: string, repoName: string) => {
       try {
         const { session: created, chat } = await createSession({
+          mode: "computer",
           repoOwner,
           repoName,
           cloneUrl: `https://github.com/${repoOwner}/${repoName}`,
@@ -204,6 +205,7 @@ export function SessionsRouteShell({
     async (repoOwner: string, repoName: string, branch: string) => {
       try {
         const { session: created, chat } = await createSession({
+          mode: "computer",
           repoOwner,
           repoName,
           branch,

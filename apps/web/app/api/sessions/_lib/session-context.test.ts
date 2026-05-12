@@ -5,6 +5,7 @@ type AuthSession = { user: { id: string } } | null;
 type SessionRecord = {
   id: string;
   userId: string;
+  mode: "computer" | "search";
   sandboxState: { type: "vercel" } | null;
 };
 
@@ -18,6 +19,7 @@ let authSession: AuthSession = { user: { id: "user-1" } };
 let sessionRecord: SessionRecord | null = {
   id: "session-1",
   userId: "user-1",
+  mode: "computer",
   sandboxState: { type: "vercel" },
 };
 let chatRecord: ChatRecord | null = {
@@ -50,6 +52,7 @@ describe("session context guards", () => {
     sessionRecord = {
       id: "session-1",
       userId: "user-1",
+      mode: "computer",
       sandboxState: { type: "vercel" },
     };
     chatRecord = {
@@ -100,6 +103,7 @@ describe("session context guards", () => {
     sessionRecord = {
       id: "session-1",
       userId: "other-user",
+      mode: "computer",
       sandboxState: { type: "vercel" },
     };
     const { requireOwnedSession } = await sessionContextModulePromise;
@@ -120,6 +124,7 @@ describe("session context guards", () => {
     sessionRecord = {
       id: "session-1",
       userId: "other-user",
+      mode: "computer",
       sandboxState: { type: "vercel" },
     };
     const { requireOwnedSession } = await sessionContextModulePromise;
@@ -188,6 +193,31 @@ describe("session context guards", () => {
     }
   });
 
+  test("requireOwnedSessionWithSandboxGuard rejects search sessions", async () => {
+    sessionRecord = {
+      id: "session-1",
+      userId: "user-1",
+      mode: "search",
+      sandboxState: null,
+    };
+    const { requireOwnedSessionWithSandboxGuard } =
+      await sessionContextModulePromise;
+
+    const result = await requireOwnedSessionWithSandboxGuard({
+      userId: "user-1",
+      sessionId: "session-1",
+      sandboxGuard: () => true,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.response.status).toBe(400);
+      expect(await getErrorMessage(result.response)).toBe(
+        "Computer mode is required",
+      );
+    }
+  });
+
   test("requireOwnedSessionChat returns 404 when chat is missing", async () => {
     chatRecord = null;
     const { requireOwnedSessionChat } = await sessionContextModulePromise;
@@ -230,6 +260,7 @@ describe("session context guards", () => {
     sessionRecord = {
       id: "session-1",
       userId: "other-user",
+      mode: "computer",
       sandboxState: { type: "vercel" },
     };
     const { requireOwnedSessionChat } = await sessionContextModulePromise;

@@ -77,6 +77,14 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   const { sessionRecord } = sessionContext;
+  if (sessionRecord.mode !== "computer") {
+    return Response.json({
+      status: "no_sandbox",
+      hasSnapshot: false,
+      lifecycle: buildLifecyclePayload(sessionRecord),
+    } satisfies ReconnectResponse);
+  }
+
   const hasPausedState =
     !hasRuntimeSandboxState(sessionRecord.sandboxState) &&
     (hasPausedSandboxState(sessionRecord.sandboxState) ||

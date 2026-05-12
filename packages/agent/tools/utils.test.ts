@@ -71,7 +71,12 @@ describe("tools/utils", () => {
 
     expect(sandbox.workingDirectory).toBe("/repo");
     expect(connectSandboxCalls).toEqual([
-      [{ type: "vercel", sandboxId: "sbx-456" }],
+      [
+        {
+          state: { type: "vercel", sandboxId: "sbx-456" },
+          options: { resume: true },
+        },
+      ],
     ]);
   });
 

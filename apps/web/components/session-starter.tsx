@@ -30,6 +30,7 @@ type SessionMode = "empty" | "repo";
 
 interface SessionStarterProps {
   onSubmit: (session: {
+    mode: "computer" | "search";
     repoOwner?: string;
     repoName?: string;
     branch?: string;
@@ -208,6 +209,7 @@ export function SessionStarter({
     }
 
     onSubmit({
+      mode: mode === "repo" ? "computer" : "search",
       repoOwner: mode === "repo" ? selectedOwner || undefined : undefined,
       repoName: mode === "repo" ? selectedRepo || undefined : undefined,
       branch: mode === "repo" ? selectedBranch || undefined : undefined,

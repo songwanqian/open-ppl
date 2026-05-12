@@ -39,6 +39,7 @@ import {
 
 interface CreateSessionRequest {
   title?: string;
+  mode?: "computer" | "search";
   repoOwner?: string;
   repoName?: string;
   branch?: string;
@@ -223,6 +224,14 @@ export async function POST(req: Request) {
   }
 
   if (
+    body.mode !== undefined &&
+    body.mode !== "computer" &&
+    body.mode !== "search"
+  ) {
+    return Response.json({ error: "Invalid session mode" }, { status: 400 });
+  }
+
+  if (
     body.autoCommitPush !== undefined &&
     typeof body.autoCommitPush !== "boolean"
   ) {
@@ -295,6 +304,7 @@ export async function POST(req: Request) {
   }
 
   const {
+    mode: requestedMode,
     repoOwner,
     repoName,
     branch,
@@ -304,6 +314,19 @@ export async function POST(req: Request) {
     autoCommitPush,
     autoCreatePr,
   } = body;
+  const mode =
+    requestedMode ??
+    (repoOwner || repoName || cloneUrl || branch ? "computer" : "search");
+
+  const hasSearchModeRepositoryFields = Boolean(
+    repoOwner ?? repoName ?? branch ?? cloneUrl ?? isNewBranch,
+  );
+  if (mode === "search" && hasSearchModeRepositoryFields) {
+    return Response.json(
+      { error: "Search sessions cannot be created with repository fields" },
+      { status: 400 },
+    );
+  }
 
   let finalBranch = branch;
   if (isNewBranch) {
@@ -315,7 +338,7 @@ export async function POST(req: Request) {
     const preferencesPromise = getUserPreferences(session.user.id);
 
     let resolvedVercelProject: VercelProjectSelection | null = null;
-    const hasRepo = Boolean(repoOwner && repoName);
+    const hasRepo = mode === "computer" && Boolean(repoOwner && repoName);
     if (hasRepo && repoOwner && repoName) {
       if (explicitVercelProject) {
         const vercelToken = await getUserVercelToken(session.user.id);
@@ -378,23 +401,26 @@ export async function POST(req: Request) {
         id: nanoid(),
         userId: session.user.id,
         title,
+        mode,
         status: "running",
-        repoOwner,
-        repoName,
-        branch: finalBranch,
-        cloneUrl,
+        repoOwner: mode === "computer" ? repoOwner : null,
+        repoName: mode === "computer" ? repoName : null,
+        branch: mode === "computer" ? finalBranch : null,
+        cloneUrl: mode === "computer" ? cloneUrl : null,
         vercelProjectId: resolvedVercelProject?.projectId ?? null,
         vercelProjectName: resolvedVercelProject?.projectName ?? null,
         vercelTeamId: resolvedVercelProject?.teamId ?? null,
         vercelTeamSlug: resolvedVercelProject?.teamSlug ?? null,
-        isNewBranch: isNewBranch ?? false,
-        autoCommitPushOverride: effectiveAutoCommitPush,
-        autoCreatePrOverride: effectiveAutoCommitPush
-          ? effectiveAutoCreatePr
-          : false,
-        globalSkillRefs: preferences.globalSkillRefs,
-        sandboxState: { type: sandboxType },
-        lifecycleState: "provisioning",
+        isNewBranch: mode === "computer" ? (isNewBranch ?? false) : false,
+        autoCommitPushOverride:
+          mode === "computer" ? effectiveAutoCommitPush : false,
+        autoCreatePrOverride:
+          mode === "computer" && effectiveAutoCommitPush
+            ? effectiveAutoCreatePr
+            : false,
+        globalSkillRefs: mode === "computer" ? preferences.globalSkillRefs : [],
+        sandboxState: mode === "computer" ? { type: sandboxType } : null,
+        lifecycleState: mode === "computer" ? "provisioning" : null,
         lifecycleVersion: 0,
       },
       initialChat: {

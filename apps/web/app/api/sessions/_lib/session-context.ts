@@ -124,6 +124,13 @@ export async function requireOwnedSessionWithSandboxGuard(
     return ownedSessionResult;
   }
 
+  if (ownedSessionResult.sessionRecord.mode !== "computer") {
+    return {
+      ok: false,
+      response: toErrorResponse("Computer mode is required", 400),
+    };
+  }
+
   if (!sandboxGuard(ownedSessionResult.sessionRecord.sandboxState)) {
     return {
       ok: false,

@@ -374,6 +374,53 @@ describe("/api/sessions POST vercel project linking", () => {
     });
   });
 
+  test("creates search sessions by default without sandbox provisioning", async () => {
+    const { POST } = await routeModulePromise;
+
+    const response = await POST(
+      createJsonRequest({
+        title: "Search the web",
+      }),
+    );
+    const body = (await response.json()) as {
+      session: Record<string, unknown>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(createCalls[0]).toMatchObject({
+      mode: "search",
+      repoOwner: null,
+      repoName: null,
+      branch: null,
+      cloneUrl: null,
+      sandboxState: null,
+      lifecycleState: null,
+      globalSkillRefs: [],
+    });
+    expect(body.session.mode).toBe("search");
+    expect(body.session.sandboxState).toBeNull();
+    expect(body.session.lifecycleState).toBeNull();
+  });
+
+  test("rejects repository fields for explicit search sessions", async () => {
+    const { POST } = await routeModulePromise;
+
+    const response = await POST(
+      createJsonRequest({
+        mode: "search",
+        repoOwner: "vercel",
+        repoName: "open-agents",
+      }),
+    );
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe(
+      "Search sessions cannot be created with repository fields",
+    );
+    expect(createCalls).toHaveLength(0);
+  });
+
   test("rejects invalid repository owners", async () => {
     const { POST } = await routeModulePromise;
 

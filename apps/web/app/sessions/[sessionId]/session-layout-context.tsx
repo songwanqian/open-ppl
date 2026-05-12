@@ -11,6 +11,7 @@ type CreateChatResult = {
 
 type SessionLayoutContextValue = {
   session: {
+    mode: "computer" | "search";
     title: string;
     repoName: string | null;
     repoOwner: string | null;

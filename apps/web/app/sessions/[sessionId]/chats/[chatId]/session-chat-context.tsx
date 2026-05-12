@@ -400,6 +400,7 @@ export function SessionChatProvider({
       };
     },
   );
+  const isComputerMode = sessionRecord.mode === "computer";
 
   const applyLifecycleTiming = useCallback(
     (
@@ -450,6 +451,11 @@ export function SessionChatProvider({
 
   const attemptReconnection =
     useCallback(async (): Promise<ReconnectionStatus> => {
+      if (!isComputerMode) {
+        setReconnectionStatus("no_sandbox");
+        return "no_sandbox";
+      }
+
       setReconnectionStatus("checking");
 
       try {
@@ -516,10 +522,14 @@ export function SessionChatProvider({
         setReconnectionStatus("failed");
         return "failed";
       }
-    }, [sessionRecord.id, sessionId, applyLifecycleTiming]);
+    }, [isComputerMode, sessionRecord.id, sessionId, applyLifecycleTiming]);
 
   const syncSandboxStatus =
     useCallback(async (): Promise<SandboxStatusSyncResult> => {
+      if (!isComputerMode) {
+        return "no_sandbox";
+      }
+
       const THROTTLE_MS = 5_000;
       const now = Date.now();
 
@@ -619,7 +629,7 @@ export function SessionChatProvider({
       } finally {
         statusSyncRef.current.inFlight = null;
       }
-    }, [sessionRecord.id, sessionId, applyLifecycleTiming]);
+    }, [isComputerMode, sessionRecord.id, sessionId, applyLifecycleTiming]);
 
   const updateSessionRepo = useCallback(
     (info: {
@@ -769,22 +779,24 @@ export function SessionChatProvider({
   const preferredSandboxType =
     asKnownSandboxType(sessionRecord.sandboxState?.type) ?? "vercel";
   const supportsDiff =
-    sessionRecord.sandboxState?.type === undefined ||
-    sessionRecord.sandboxState.type === "vercel";
+    isComputerMode &&
+    (sessionRecord.sandboxState?.type === undefined ||
+      sessionRecord.sandboxState.type === "vercel");
   const supportsRepoCreation =
-    sessionRecord.sandboxState?.type === undefined ||
-    sessionRecord.sandboxState.type === "vercel";
-  const hasRuntimeSandboxState = hasRuntimeSandboxStateValue(
-    sessionRecord.sandboxState,
-  );
+    isComputerMode &&
+    (sessionRecord.sandboxState?.type === undefined ||
+      sessionRecord.sandboxState.type === "vercel");
+  const hasRuntimeSandboxState =
+    isComputerMode && hasRuntimeSandboxStateValue(sessionRecord.sandboxState);
   const hasSnapshot =
+    isComputerMode &&
     !hasRuntimeSandboxState &&
     (hasSnapshotState ||
       hasPausedSandboxState(sessionRecord.sandboxState) ||
       !!sessionRecord.snapshotUrl);
 
   // Use SWR hooks for diff and files
-  const sandboxConnected = sandboxInfo !== null;
+  const sandboxConnected = isComputerMode && sandboxInfo !== null;
 
   // Note: cachedDiff is stored as jsonb and cast to DiffResponse without runtime validation.
   // This is safe as long as the schema is only written by our own diff route.

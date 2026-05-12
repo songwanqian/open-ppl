@@ -16,11 +16,12 @@ const updateCalls: Array<{
 let sessionRecord: {
   id: string;
   userId: string;
+  mode: "computer" | "search";
   sandboxState: {
     type: "vercel";
     sandboxName: string;
     expiresAt: number;
-  };
+  } | null;
   lifecycleState: "active" | "failed";
   lifecycleError: string | null;
   lifecycleVersion: number;
@@ -83,6 +84,7 @@ describe("/api/sandbox/status lifecycle safety net", () => {
     sessionRecord = {
       id: "session-1",
       userId: "user-1",
+      mode: "computer",
       sandboxState: {
         type: "vercel",
         sandboxName: "session_session-1",
@@ -118,6 +120,27 @@ describe("/api/sandbox/status lifecycle safety net", () => {
       sessionId: "session-1",
       reason: "status-check-overdue",
     });
+    expect(updateCalls).toHaveLength(0);
+  });
+
+  test("returns no_sandbox for search sessions without lifecycle kicks", async () => {
+    const { GET } = await routeModulePromise;
+    sessionRecord.mode = "search";
+    sessionRecord.sandboxState = null;
+    sessionRecord.lifecycleState = "active";
+
+    const response = await GET(
+      new Request("http://localhost/api/sandbox/status?sessionId=session-1"),
+    );
+    const payload = (await response.json()) as {
+      status: string;
+      hasSnapshot: boolean;
+    };
+
+    expect(response.ok).toBe(true);
+    expect(payload.status).toBe("no_sandbox");
+    expect(payload.hasSnapshot).toBe(false);
+    expect(kickCalls).toHaveLength(0);
     expect(updateCalls).toHaveLength(0);
   });
 

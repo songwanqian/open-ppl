@@ -49,6 +49,7 @@ interface RequireOwnedSessionChatParams {
   forbiddenMessage?: string;
   requireActiveSandbox?: boolean;
   sandboxInactiveMessage?: string;
+  requireComputerMode?: boolean;
 }
 
 interface RequireOwnedChatByIdParams {
@@ -98,6 +99,7 @@ export async function requireOwnedSessionChat(
     forbiddenMessage = "Forbidden",
     requireActiveSandbox = false,
     sandboxInactiveMessage = "Sandbox not initialized",
+    requireComputerMode = false,
   } = params;
 
   const [sessionRecord, chat] = await Promise.all([
@@ -123,6 +125,13 @@ export async function requireOwnedSessionChat(
     return {
       ok: false,
       response: toErrorResponse("Chat not found", 404, format),
+    };
+  }
+
+  if (requireComputerMode && sessionRecord.mode !== "computer") {
+    return {
+      ok: false,
+      response: toErrorResponse("Computer mode is required", 400, format),
     };
   }
 

@@ -37,8 +37,9 @@ export function ChatTabs({ activeChatId }: ChatTabsProps) {
   const router = useRouter();
   const params = useParams<{ sessionId?: string }>();
   const sessionId = params.sessionId ?? "";
-  const { chats, createChat, switchChat, deleteChat, renameChat } =
+  const { session, chats, createChat, switchChat, deleteChat, renameChat } =
     useSessionLayout();
+  const isComputerMode = session.mode === "computer";
   const {
     activeView,
     setActiveView,
@@ -206,9 +207,10 @@ export function ChatTabs({ activeChatId }: ChatTabsProps) {
   }, [deletingChatId, activeChatId, chats, deleteChat, switchChat]);
 
   const canDelete = chats.length > 1;
-  const showChangesTab = !changesTabDismissed && !!focusedDiffFile;
+  const showChangesTab =
+    isComputerMode && !changesTabDismissed && !!focusedDiffFile;
   const insertAt = showChangesTab ? (changesTabIndex ?? chats.length) : null;
-  const showFileTab = !fileTabDismissed && !!focusedFilePath;
+  const showFileTab = isComputerMode && !fileTabDismissed && !!focusedFilePath;
   const fileInsertAt = showFileTab
     ? (fileTabIndex ?? chats.length + (showChangesTab ? 1 : 0))
     : null;

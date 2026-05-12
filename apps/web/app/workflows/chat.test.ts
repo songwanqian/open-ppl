@@ -76,6 +76,7 @@ const spies = {
     Promise.resolve(),
   ),
   refreshLifecycleActivity: mock(() => Promise.resolve()),
+  runSearchWorkflowTurn: mock(() => Promise.resolve()),
   hasAutoCommitChangesStep: mock(() => Promise.resolve(true)),
   runAutoCommitStep: mock(() =>
     Promise.resolve({ committed: false, pushed: false }),
@@ -94,6 +95,7 @@ const spies = {
 let testSessionRecord: {
   id: string;
   userId: string;
+  mode: "computer" | "search";
   autoCommitPushOverride: boolean | null;
   autoCreatePrOverride: boolean | null;
   repoOwner: string | null;
@@ -335,6 +337,10 @@ mock.module("./chat-sandbox-runtime", () => ({
   resolveChatSandboxRuntime: spies.resolveChatSandboxRuntime,
 }));
 
+mock.module("./search", () => ({
+  runSearchWorkflowTurn: spies.runSearchWorkflowTurn,
+}));
+
 const { runAgentWorkflow } = await import("./chat");
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -391,6 +397,7 @@ beforeEach(() => {
   testSessionRecord = {
     id: "session-1",
     userId: "user-1",
+    mode: "computer",
     autoCommitPushOverride: null,
     autoCreatePrOverride: null,
     repoOwner: "acme",
@@ -453,6 +460,24 @@ describe("runAgentWorkflow", () => {
     expect(types[0]).toBe("start");
     expect(types[types.length - 1]).toBe("finish");
     expect(spies.persistAssistantMessage).toHaveBeenCalledTimes(1);
+  });
+
+  test("delegates search sessions without resolving sandbox runtime", async () => {
+    testSessionRecord.mode = "search";
+
+    await runAgentWorkflow(makeOptions());
+
+    expect(spies.runSearchWorkflowTurn).toHaveBeenCalledTimes(1);
+    expect(spies.runSearchWorkflowTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chatId: "chat-1",
+        sessionId: "session-1",
+        userId: "user-1",
+        workflowRunId: "wrun_test-123",
+      }),
+    );
+    expect(spies.resolveChatSandboxRuntime).not.toHaveBeenCalled();
+    expect(spies.persistSandboxState).not.toHaveBeenCalled();
   });
 
   test("sends start and finish chunks to writable", async () => {

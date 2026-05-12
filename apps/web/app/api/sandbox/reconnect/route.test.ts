@@ -16,6 +16,7 @@ let probeResult: {
 let sessionRecord: {
   id: string;
   userId: string;
+  mode: "computer" | "search";
   snapshotUrl: string | null;
   lifecycleState: "failed" | "active" | "hibernated";
   lifecycleError: string | null;
@@ -23,7 +24,7 @@ let sessionRecord: {
     type: "vercel";
     sandboxName?: string;
     expiresAt?: number;
-  };
+  } | null;
   lastActivityAt: Date | null;
   hibernateAfter: Date | null;
   sandboxExpiresAt: Date | null;
@@ -94,6 +95,7 @@ describe("/api/sandbox/reconnect", () => {
     sessionRecord = {
       id: "session-1",
       userId: "user-1",
+      mode: "computer",
       snapshotUrl: "snap-1",
       lifecycleState: "failed",
       lifecycleError: "snapshot failed",
@@ -131,6 +133,28 @@ describe("/api/sandbox/reconnect", () => {
     expect(updateCalls[0]?.sessionId).toBe("session-1");
     expect(updateCalls[0]?.patch.lifecycleState).toBe("active");
     expect(updateCalls[0]?.patch.lifecycleError).toBeNull();
+  });
+
+  test("returns no_sandbox for search sessions without reconnecting", async () => {
+    const { GET } = await routeModulePromise;
+
+    sessionRecord.mode = "search";
+    sessionRecord.sandboxState = null;
+
+    const response = await GET(
+      new Request("http://localhost/api/sandbox/reconnect?sessionId=session-1"),
+    );
+    const payload = (await response.json()) as {
+      status: string;
+      hasSnapshot: boolean;
+      lifecycle: { state: string | null };
+    };
+
+    expect(response.ok).toBe(true);
+    expect(payload.status).toBe("no_sandbox");
+    expect(payload.hasSnapshot).toBe(false);
+    expect(payload.lifecycle.state).toBe("failed");
+    expect(updateCalls).toHaveLength(0);
   });
 
   test("marks sandbox expired when the reconnect probe hits a 410", async () => {

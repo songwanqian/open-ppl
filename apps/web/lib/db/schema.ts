@@ -131,6 +131,11 @@ export const sessions = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
+    mode: text("mode", {
+      enum: ["computer", "search"],
+    })
+      .notNull()
+      .default("search"),
     status: text("status", {
       enum: ["running", "completed", "failed", "archived"],
     })
@@ -197,6 +202,48 @@ export const sessions = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [index("sessions_user_id_idx").on(table.userId)],
+);
+
+export const systemPrompts = pgTable(
+  "system_prompts",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    mode: text("mode", {
+      enum: ["computer", "search"],
+    }).notNull(),
+    content: text("content").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("system_prompts_mode_idx").on(table.mode),
+    index("system_prompts_enabled_idx").on(table.enabled),
+  ],
+);
+
+export const mcpServers = pgTable(
+  "mcp_servers",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    purpose: text("purpose", {
+      enum: ["search", "web_fetch", "general"],
+    }).notNull(),
+    url: text("url").notNull(),
+    headers: jsonb("headers")
+      .$type<Record<string, string>>()
+      .notNull()
+      .default({}),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("mcp_servers_purpose_idx").on(table.purpose),
+    index("mcp_servers_enabled_idx").on(table.enabled),
+  ],
 );
 
 export const chats = pgTable(
@@ -316,8 +363,13 @@ export const workflowRunSteps = pgTable(
 
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
+export type SessionMode = Session["mode"];
 export type VercelProjectLink = typeof vercelProjectLinks.$inferSelect;
 export type NewVercelProjectLink = typeof vercelProjectLinks.$inferInsert;
+export type SystemPrompt = typeof systemPrompts.$inferSelect;
+export type NewSystemPrompt = typeof systemPrompts.$inferInsert;
+export type McpServer = typeof mcpServers.$inferSelect;
+export type NewMcpServer = typeof mcpServers.$inferInsert;
 export type Chat = typeof chats.$inferSelect;
 export type NewChat = typeof chats.$inferInsert;
 export type Share = typeof shares.$inferSelect;

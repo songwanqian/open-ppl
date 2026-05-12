@@ -49,6 +49,21 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   const { sessionRecord } = sessionContext;
+  if (sessionRecord.mode !== "computer") {
+    return Response.json({
+      status: "no_sandbox",
+      hasSnapshot: false,
+      lifecycleVersion: sessionRecord.lifecycleVersion,
+      lifecycle: {
+        serverTime: Date.now(),
+        state: sessionRecord.lifecycleState,
+        lastActivityAt: sessionRecord.lastActivityAt?.getTime() ?? null,
+        hibernateAfter: sessionRecord.hibernateAfter?.getTime() ?? null,
+        sandboxExpiresAt: sessionRecord.sandboxExpiresAt?.getTime() ?? null,
+      },
+    } satisfies SandboxStatusResponse);
+  }
+
   let effectiveSessionRecord = sessionRecord;
   const hasRuntimeState = hasRuntimeSandboxState(sessionRecord.sandboxState);
   const hasPausedState =

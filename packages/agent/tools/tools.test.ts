@@ -49,14 +49,23 @@ mock.module("ai", () => {
 });
 
 mock.module("@open-agents/sandbox", () => ({
-  connectSandbox: async (state: { sandboxId?: string }) => {
-    if (!state.sandboxId) {
-      throw new Error("Missing sandboxId in test sandbox state.");
+  connectSandbox: async (input: {
+    state?: { sandboxId?: string; sandboxName?: string };
+    sandboxId?: string;
+    sandboxName?: string;
+  }) => {
+    const sandboxKey =
+      input.state?.sandboxName ??
+      input.state?.sandboxId ??
+      input.sandboxName ??
+      input.sandboxId;
+    if (!sandboxKey) {
+      throw new Error("Missing sandbox name in test sandbox state.");
     }
 
-    const sandbox = sandboxRegistry.get(state.sandboxId);
+    const sandbox = sandboxRegistry.get(sandboxKey);
     if (!sandbox) {
-      throw new Error(`Unknown test sandbox: ${state.sandboxId}`);
+      throw new Error(`Unknown test sandbox: ${sandboxKey}`);
     }
 
     return sandbox;
@@ -96,7 +105,7 @@ function createContext(sandbox: Record<string, unknown>) {
 
   return {
     sandbox: {
-      state: { type: "vercel" as const, sandboxId },
+      state: { type: "vercel" as const, sandboxName: sandboxId },
       workingDirectory:
         typeof sandbox.workingDirectory === "string"
           ? sandbox.workingDirectory

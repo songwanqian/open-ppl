@@ -237,6 +237,14 @@ function getPartIdentity(part: WebAgentUIMessagePart): string {
     return "file";
   }
 
+  if (part.type === "source-url") {
+    return `source:${part.sourceId}`;
+  }
+
+  if (part.type === "source-document") {
+    return `source:${part.sourceId}`;
+  }
+
   if (isGitDataPart(part)) {
     return part.id ? `data:${part.type}:${part.id}` : `data:${part.type}`;
   }
@@ -395,6 +403,39 @@ function GitDataPartCard({
       {/* Subtitle (commit message when SHA is shown as detail) */}
       {subtitle && <p className="sr-only">{subtitle}</p>}
     </div>
+  );
+}
+
+type SourcePart = Extract<
+  WebAgentUIMessagePart,
+  { type: "source-url" | "source-document" }
+>;
+
+function SourceChip({ part }: { part: SourcePart }) {
+  const title =
+    part.type === "source-url"
+      ? (part.title ?? part.url)
+      : (part.title ?? part.filename);
+
+  if (part.type === "source-url") {
+    return (
+      <a
+        href={part.url}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <ExternalLink className="h-3 w-3 shrink-0" />
+        <span className="truncate">{title}</span>
+      </a>
+    );
+  }
+
+  return (
+    <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2 py-1 text-xs text-muted-foreground">
+      <Link2 className="h-3 w-3 shrink-0" />
+      <span className="truncate">{title}</span>
+    </span>
   );
 }
 
@@ -1044,7 +1085,9 @@ export function SessionChatContent({
   const hasMounted = useHasMounted();
   const {
     activeView,
+    setActiveView,
     gitPanelOpen,
+    setGitPanelOpen,
     shareRequested,
     setShareRequested,
     setHasActionNeeded,
@@ -1196,6 +1239,24 @@ export function SessionChatContent({
     modelOptions,
     modelOptionsLoading,
   } = useSessionChatMetadataContext();
+  const isComputerMode = session.mode === "computer";
+  useEffect(() => {
+    if (isComputerMode) {
+      return;
+    }
+    if (activeView !== "chat") {
+      setActiveView("chat");
+    }
+    if (gitPanelOpen) {
+      setGitPanelOpen(false);
+    }
+  }, [
+    isComputerMode,
+    activeView,
+    setActiveView,
+    gitPanelOpen,
+    setGitPanelOpen,
+  ]);
   const {
     chat,
     contextLimit,
@@ -1563,6 +1624,10 @@ export function SessionChatContent({
   });
   const requestStatusSync = useCallback(
     async (mode: "normal" | "force" = "normal"): Promise<void> => {
+      if (!isComputerMode) {
+        return;
+      }
+
       const now = Date.now();
       if (statusSyncInFlightRef.current) return;
       if (mode === "normal" && now - lastStatusSyncAtRef.current < 5_000) {
@@ -1577,7 +1642,7 @@ export function SessionChatContent({
         statusSyncInFlightRef.current = false;
       }
     },
-    [syncSandboxStatus],
+    [isComputerMode, syncSandboxStatus],
   );
 
   const requestMarkChatRead = useCallback(
@@ -2133,6 +2198,10 @@ export function SessionChatContent({
 
   const waitForSandboxReady = useCallback(
     async (maxAttempts = 8): Promise<boolean> => {
+      if (!isComputerMode) {
+        return false;
+      }
+
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const result = await attemptReconnection();
         if (result === "connected") {
@@ -2148,7 +2217,7 @@ export function SessionChatContent({
       }
       return false;
     },
-    [attemptReconnection, syncSandboxStatus],
+    [isComputerMode, attemptReconnection, syncSandboxStatus],
   );
 
   const refreshWorkspaceAfterRestore = useCallback(async () => {
@@ -2246,6 +2315,10 @@ export function SessionChatContent({
   ]);
 
   const _handleCreateNewSandbox = useCallback(async () => {
+    if (!isComputerMode) {
+      return;
+    }
+
     setIsCreatingSandbox(true);
     setSandboxCreateError(null);
 
@@ -2277,6 +2350,7 @@ export function SessionChatContent({
     session.cloneUrl,
     session.branch,
     session.id,
+    isComputerMode,
     preferredSandboxType,
     setSandboxInfo,
     setSandboxTypeFromUnknown,
@@ -2407,7 +2481,7 @@ export function SessionChatContent({
   // (connected sandbox, no sandbox, and snapshot availability).
   // Skip for archived sessions -- they should never spin up a sandbox.
   useEffect(() => {
-    if (isArchived) return;
+    if (isArchived || !isComputerMode) return;
     if (
       !sandboxInfo &&
       !isCreatingSandbox &&
@@ -2418,6 +2492,7 @@ export function SessionChatContent({
     }
   }, [
     isArchived,
+    isComputerMode,
     sandboxInfo,
     isCreatingSandbox,
     isRestoringSnapshot,
@@ -2427,7 +2502,7 @@ export function SessionChatContent({
 
   // Server-authoritative lifecycle state: lightweight status poll every 15s.
   useEffect(() => {
-    if (isCreatingSandbox || isRestoringSnapshot) return;
+    if (!isComputerMode || isCreatingSandbox || isRestoringSnapshot) return;
 
     const poll = () => {
       if (reconnectionStatus === "checking") return;
@@ -2446,6 +2521,7 @@ export function SessionChatContent({
   }, [
     isCreatingSandbox,
     isRestoringSnapshot,
+    isComputerMode,
     reconnectionStatus,
     requestStatusSync,
   ]);
@@ -2685,6 +2761,7 @@ export function SessionChatContent({
     reconnectionStatus,
   ]);
   const canRunDevServer =
+    isComputerMode &&
     !isArchived &&
     isSandboxActive &&
     !isCreatingSandbox &&
@@ -2705,15 +2782,14 @@ export function SessionChatContent({
     codeEditor.state.status === "starting" ||
     codeEditor.state.status === "stopping";
 
-  const hasRepo = Boolean(session.cloneUrl);
+  const hasRepo = isComputerMode && Boolean(session.cloneUrl);
   const hasExistingPr = session.prNumber != null;
   const previewLookupBranch =
     gitStatus?.branch && gitStatus.branch !== "HEAD"
       ? gitStatus.branch
       : session.branch;
-  const hasBranchPreviewLookup = Boolean(
-    session.vercelProjectId && previewLookupBranch,
-  );
+  const hasBranchPreviewLookup =
+    isComputerMode && Boolean(session.vercelProjectId && previewLookupBranch);
   const existingPrUrl =
     hasExistingPr && session.repoOwner && session.repoName
       ? `https://github.com/${session.repoOwner}/${session.repoName}/pull/${session.prNumber}`
@@ -2726,7 +2802,7 @@ export function SessionChatContent({
   ).toString();
   const { data: prDeploymentData, mutate: refreshPrDeployment } =
     useSWR<PrDeploymentResponse>(
-      hasExistingPr || hasBranchPreviewLookup
+      isComputerMode && (hasExistingPr || hasBranchPreviewLookup)
         ? `/api/sessions/${session.id}/pr-deployment${
             prDeploymentQuery ? `?${prDeploymentQuery}` : ""
           }`
@@ -2746,7 +2822,8 @@ export function SessionChatContent({
         // branch preview is rolling forward to a newer deployment after a push.
         refreshInterval: (latestData) =>
           getPrDeploymentRefreshInterval({
-            shouldPoll: hasExistingPr || hasBranchPreviewLookup,
+            shouldPoll:
+              isComputerMode && (hasExistingPr || hasBranchPreviewLookup),
             deploymentUrl: latestData?.deploymentUrl,
             documentHasFocus:
               typeof document === "undefined" ? true : document.hasFocus(),
@@ -2792,7 +2869,7 @@ export function SessionChatContent({
     prDeploymentUrl ??
     (isDeploymentFailed ? failedDeploymentUrl : null);
   const showHeaderActions =
-    canRunDevServer || Boolean(previewDeploymentTargetUrl);
+    isComputerMode && (canRunDevServer || Boolean(previewDeploymentTargetUrl));
 
   // When auto-commit lands (transitions from committing to clean), mark the
   // current preview deployment as stale so the UI shows "Deploying…" until
@@ -2938,48 +3015,50 @@ export function SessionChatContent({
     [archiveSession, router, updateSessionPullRequest],
   );
 
-  const gitPanelElement = gitPanelOpen ? (
-    <GitPanel
-      session={session}
-      hasRepo={hasRepo}
-      hasExistingPr={hasExistingPr}
-      existingPrUrl={existingPrUrl}
-      prDeploymentUrl={prDeploymentUrl}
-      buildingDeploymentUrl={buildingDeploymentUrl}
-      failedDeploymentUrl={failedDeploymentUrl}
-      isDeploymentStale={isDeploymentStale}
-      isDeploymentFailed={isDeploymentFailed}
-      hasUncommittedGitChanges={hasUncommittedGitChanges}
-      supportsRepoCreation={supportsRepoCreation}
-      hasDiff={Boolean(diff || session.cachedDiff)}
-      canCloseAndArchive={canCloseAndArchive}
-      diffFiles={diff?.files ?? null}
-      diffSummary={diff?.summary ?? null}
-      diffRefreshing={diffRefreshing}
-      onCreateRepoClick={() => setRepoDialogOpen(true)}
-      refreshDiff={refreshDiff}
-      onMerged={handleMerged}
-      onCloseAndArchiveClick={() => setCloseDialogOpen(true)}
-      onFixChecks={handleFixChecks}
-      onFixConflicts={(baseBranchRef) => handleFixConflicts(baseBranchRef)}
-      hasSandbox={sandboxInfo !== null}
-      gitStatus={gitStatus}
-      gitStatusLoading={gitStatusLoading}
-      refreshGitStatus={refreshGitStatus}
-      onCommitted={handleCommitted}
-      isAgentWorking={hasPendingResponse || isChatInFlight}
-      onPrDetected={(pr) => {
-        updateSessionPullRequest(pr);
-        void refreshGitStatus().catch(() => {});
-      }}
-      onGitMessage={upsertSyntheticAssistantGitMessage}
-    />
-  ) : null;
+  const gitPanelElement =
+    isComputerMode && gitPanelOpen ? (
+      <GitPanel
+        session={session}
+        hasRepo={hasRepo}
+        hasExistingPr={hasExistingPr}
+        existingPrUrl={existingPrUrl}
+        prDeploymentUrl={prDeploymentUrl}
+        buildingDeploymentUrl={buildingDeploymentUrl}
+        failedDeploymentUrl={failedDeploymentUrl}
+        isDeploymentStale={isDeploymentStale}
+        isDeploymentFailed={isDeploymentFailed}
+        hasUncommittedGitChanges={hasUncommittedGitChanges}
+        supportsRepoCreation={supportsRepoCreation}
+        hasDiff={Boolean(diff || session.cachedDiff)}
+        canCloseAndArchive={canCloseAndArchive}
+        diffFiles={diff?.files ?? null}
+        diffSummary={diff?.summary ?? null}
+        diffRefreshing={diffRefreshing}
+        onCreateRepoClick={() => setRepoDialogOpen(true)}
+        refreshDiff={refreshDiff}
+        onMerged={handleMerged}
+        onCloseAndArchiveClick={() => setCloseDialogOpen(true)}
+        onFixChecks={handleFixChecks}
+        onFixConflicts={(baseBranchRef) => handleFixConflicts(baseBranchRef)}
+        hasSandbox={sandboxInfo !== null}
+        gitStatus={gitStatus}
+        gitStatusLoading={gitStatusLoading}
+        refreshGitStatus={refreshGitStatus}
+        onCommitted={handleCommitted}
+        isAgentWorking={hasPendingResponse || isChatInFlight}
+        onPrDetected={(pr) => {
+          updateSessionPullRequest(pr);
+          void refreshGitStatus().catch(() => {});
+        }}
+        onGitMessage={upsertSyntheticAssistantGitMessage}
+      />
+    ) : null;
 
   return (
     <>
       {/* Git panel portaled to layout-level for full page height */}
-      {gitPanelOpen &&
+      {isComputerMode &&
+        gitPanelOpen &&
         panelPortalRef.current &&
         createPortal(gitPanelElement, panelPortalRef.current)}
 
@@ -3180,9 +3259,9 @@ export function SessionChatContent({
 
         {/* Main content: chat, diff, or file */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          {activeView === "diff" ? (
+          {isComputerMode && activeView === "diff" ? (
             <DiffTabView />
-          ) : activeView === "file" ? (
+          ) : isComputerMode && activeView === "file" ? (
             <FileTabView />
           ) : (
             <>
@@ -3522,6 +3601,21 @@ export function SessionChatContent({
                                       className="max-w-full"
                                     >
                                       <GitDataPartCard part={p} />
+                                    </div>
+                                  );
+                                }
+
+                                if (
+                                  p.type === "source-url" ||
+                                  p.type === "source-document"
+                                ) {
+                                  if (!isToolCallsExpanded) return null;
+                                  return (
+                                    <div
+                                      key={`${m.id}-${group.renderKey}`}
+                                      className="max-w-full pl-[22px]"
+                                    >
+                                      <SourceChip part={p} />
                                     </div>
                                   );
                                 }
@@ -4243,7 +4337,7 @@ export function SessionChatContent({
       </div>
 
       {/* Merge PR Dialog */}
-      {session && (
+      {isComputerMode && session && (
         <MergePrDialog
           open={mergeDialogOpen}
           onOpenChange={setMergeDialogOpen}
@@ -4263,7 +4357,7 @@ export function SessionChatContent({
       )}
 
       {/* Close PR Dialog */}
-      {session && (
+      {isComputerMode && session && (
         <ClosePrDialog
           open={closeDialogOpen}
           onOpenChange={setCloseDialogOpen}
@@ -4273,7 +4367,7 @@ export function SessionChatContent({
       )}
 
       {/* Create Repo Dialog */}
-      {session && (
+      {isComputerMode && session && (
         <CreateRepoDialog
           open={repoDialogOpen}
           onOpenChange={setRepoDialogOpen}
@@ -4291,38 +4385,42 @@ export function SessionChatContent({
       )}
 
       {/* Diff Viewer Modal */}
-      <DiffViewer open={showDiffPanel} onOpenChange={setShowDiffPanel} />
-      <WorkspaceFileViewer
-        sessionId={session.id}
-        filePath={selectedWorkspaceFile}
-        open={selectedWorkspaceFile !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedWorkspaceFile(null);
-          }
-        }}
-        editorBusy={
-          codeEditor.state.status === "starting" ||
-          codeEditor.state.status === "stopping"
-        }
-        editorDisabledReason={codeEditorDisabledReason}
-        onOpenInEditor={(filePath) => {
-          void codeEditor.handleOpenFile(filePath);
-        }}
-        onAddToPrompt={(filePath, selectedText, comment) => {
-          // Build a single snippet with file ref, selected text, and the user's comment
-          const parts = [`File: ${filePath}`, "```", selectedText, "```"];
-          if (comment) {
-            parts.push("", `> ${comment}`);
-          }
-          const basename = filePath.split("/").pop() ?? filePath;
-          addTextAttachment(parts.join("\n"), `comment-on-${basename}`);
-          // Focus the input after a brief delay (keep file viewer open)
-          setTimeout(() => {
-            inputRef.current?.focus();
-          }, 100);
-        }}
-      />
+      {isComputerMode && (
+        <>
+          <DiffViewer open={showDiffPanel} onOpenChange={setShowDiffPanel} />
+          <WorkspaceFileViewer
+            sessionId={session.id}
+            filePath={selectedWorkspaceFile}
+            open={selectedWorkspaceFile !== null}
+            onOpenChange={(open) => {
+              if (!open) {
+                setSelectedWorkspaceFile(null);
+              }
+            }}
+            editorBusy={
+              codeEditor.state.status === "starting" ||
+              codeEditor.state.status === "stopping"
+            }
+            editorDisabledReason={codeEditorDisabledReason}
+            onOpenInEditor={(filePath) => {
+              void codeEditor.handleOpenFile(filePath);
+            }}
+            onAddToPrompt={(filePath, selectedText, comment) => {
+              // Build a single snippet with file ref, selected text, and the user's comment
+              const parts = [`File: ${filePath}`, "```", selectedText, "```"];
+              if (comment) {
+                parts.push("", `> ${comment}`);
+              }
+              const basename = filePath.split("/").pop() ?? filePath;
+              addTextAttachment(parts.join("\n"), `comment-on-${basename}`);
+              // Focus the input after a brief delay (keep file viewer open)
+              setTimeout(() => {
+                inputRef.current?.focus();
+              }, 100);
+            }}
+          />
+        </>
+      )}
     </>
   );
 }
