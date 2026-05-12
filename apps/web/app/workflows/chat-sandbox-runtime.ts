@@ -1,9 +1,5 @@
 import { discoverSkills } from "@open-agents/agent";
-import {
-  connectSandbox,
-  type Sandbox,
-  type SandboxState,
-} from "@open-agents/sandbox";
+import type { Sandbox, SandboxState } from "@open-agents/sandbox";
 import type { UIMessageChunk } from "ai";
 import { getWritable } from "workflow";
 import type { WebAgentWorkspaceStatusData } from "@/app/types";
@@ -232,6 +228,7 @@ export async function resolveChatSandboxRuntime(params: {
 
   let sandbox: Sandbox;
   try {
+    const { connectSandbox } = await import("@open-agents/sandbox");
     sandbox = await connectSandbox({
       state: buildSandboxState(session),
       options: {

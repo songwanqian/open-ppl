@@ -9,7 +9,6 @@ import {
   type UIMessageChunk,
 } from "ai";
 import type { OpenAgentCallOptions } from "@open-agents/agent";
-import { SandboxExecError } from "@open-agents/sandbox";
 import { getWorkflowMetadata, getWritable } from "workflow";
 import { getRun } from "workflow/api";
 import { assistantFileLinkPrompt } from "@/lib/assistant-file-links";
@@ -57,6 +56,16 @@ import type {
 } from "@/lib/db/workflow-runs";
 import { resolveChatModelSelectionWithGateway } from "../api/chat/_lib/model-selection";
 import { resolveChatSandboxRuntime } from "./chat-sandbox-runtime";
+
+function isSandboxExecError(
+  error: unknown,
+): error is Error & { isInfrastructure: boolean } {
+  return (
+    error instanceof Error &&
+    error.name === "SandboxExecError" &&
+    "isInfrastructure" in error
+  );
+}
 
 type AuthSessionContext = Pick<AuthSession, "authProvider" | "user"> | null;
 
@@ -295,7 +304,7 @@ function getSetupErrorMessage(error: unknown): string {
     return "This session is archived. Unarchive it to continue.";
   }
 
-  if (error instanceof SandboxExecError && error.isInfrastructure) {
+  if (isSandboxExecError(error) && error.isInfrastructure) {
     return "The sandbox environment is not available. Please try refreshing or starting a new session.";
   }
 
@@ -753,7 +762,7 @@ export async function runAgentWorkflow(options: Options) {
         );
         consecutiveInfrastructureErrors = 0;
       } catch (error) {
-        if (error instanceof SandboxExecError) {
+        if (isSandboxExecError(error)) {
           consecutiveInfrastructureErrors++;
           if (
             consecutiveInfrastructureErrors >=
