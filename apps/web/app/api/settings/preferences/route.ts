@@ -31,7 +31,7 @@ export async function GET(req: Request) {
     return Response.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const preferences = sanitizeUserPreferencesForSession(
+  const preferences = await sanitizeUserPreferencesForSession(
     await getUserPreferences(session.user.id),
     session,
     req.url,
@@ -191,7 +191,7 @@ export async function PATCH(req: Request) {
   }
 
   try {
-    const preferences = sanitizeUserPreferencesForSession(
+    const preferences = await sanitizeUserPreferencesForSession(
       await updateUserPreferences(session.user.id, updates),
       session,
       req.url,

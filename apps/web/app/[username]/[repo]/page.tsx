@@ -106,7 +106,7 @@ export default async function RepoPage({ params }: RepoPageProps) {
     preferencesPromise,
     savedVercelProjectPromise,
   ]);
-  const preferences = sanitizeUserPreferencesForSession(
+  const preferences = await sanitizeUserPreferencesForSession(
     rawPreferences,
     session,
     requestHost,

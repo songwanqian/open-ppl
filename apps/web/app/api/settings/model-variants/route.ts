@@ -2,7 +2,7 @@ import { nanoid } from "nanoid";
 import {
   createModelVariantInputSchema,
   deleteModelVariantInputSchema,
-  getAllVariants,
+  getAllVariantsAsync,
   isBuiltInVariant,
   MODEL_VARIANT_ID_PREFIX,
   modelVariantSchema,
@@ -51,7 +51,7 @@ export async function GET(req: Request) {
   const preferences = await getUserPreferences(session.user.id);
   return Response.json({
     modelVariants: filterModelVariantsForSession(
-      getAllVariants(preferences.modelVariants),
+      await getAllVariantsAsync(preferences.modelVariants),
       session,
       req.url,
     ),
@@ -102,7 +102,7 @@ export async function POST(req: Request) {
 
     return Response.json({
       modelVariants: filterModelVariantsForSession(
-        getAllVariants(updatedPreferences.modelVariants),
+        await getAllVariantsAsync(updatedPreferences.modelVariants),
         session,
         req.url,
       ),
@@ -175,7 +175,7 @@ export async function PATCH(req: Request) {
 
     return Response.json({
       modelVariants: filterModelVariantsForSession(
-        getAllVariants(updatedPreferences.modelVariants),
+        await getAllVariantsAsync(updatedPreferences.modelVariants),
         session,
         req.url,
       ),
@@ -224,7 +224,7 @@ export async function DELETE(req: Request) {
 
     return Response.json({
       modelVariants: filterModelVariantsForSession(
-        getAllVariants(updatedPreferences.modelVariants),
+        await getAllVariantsAsync(updatedPreferences.modelVariants),
         session,
         req.url,
       ),

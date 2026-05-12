@@ -11,7 +11,7 @@ import {
 } from "@/lib/db/sessions";
 import { getUserPreferences } from "@/lib/db/user-preferences";
 import { sanitizeSelectedModelIdForSession } from "@/lib/model-access";
-import { getAllVariants } from "@/lib/model-variants";
+import { getAllVariantsAsync } from "@/lib/model-variants";
 import { getServerSession } from "@/lib/session/get-server-session";
 
 type RouteContext = {
@@ -58,7 +58,7 @@ export async function GET(req: Request, context: RouteContext) {
   const modelId =
     sanitizeSelectedModelIdForSession(
       chatContext.chat.modelId,
-      getAllVariants(preferences.modelVariants),
+      await getAllVariantsAsync(preferences.modelVariants),
       session,
       req.url,
     ) ??
@@ -119,7 +119,7 @@ export async function PATCH(req: Request, context: RouteContext) {
     const preferences = await getUserPreferences(authResult.userId);
     const sanitizedModelId = sanitizeSelectedModelIdForSession(
       nextModelId,
-      getAllVariants(preferences.modelVariants),
+      await getAllVariantsAsync(preferences.modelVariants),
       session,
       req.url,
     );
@@ -138,7 +138,7 @@ export async function PATCH(req: Request, context: RouteContext) {
       modelId:
         sanitizeSelectedModelIdForSession(
           updatedChat.modelId,
-          getAllVariants(preferences.modelVariants),
+          await getAllVariantsAsync(preferences.modelVariants),
           session,
           req.url,
         ) ?? updatedChat.modelId,

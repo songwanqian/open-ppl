@@ -3,8 +3,10 @@
 import {
   ArrowLeft,
   Cable,
+  Database,
   LogOut,
   Menu,
+  Server,
   Settings as SettingsIcon,
   ShieldAlert,
   SlidersHorizontal,
@@ -97,12 +99,26 @@ const baseSidebarItems = [
   },
 ];
 
-const adminSidebarItem = {
-  id: "admin",
-  label: "Admin",
-  href: "/settings/admin",
-  icon: ShieldAlert,
-};
+const adminSidebarItems = [
+  {
+    id: "admin-gateways",
+    label: "Gateway Accounts",
+    href: "/settings/admin/gateways",
+    icon: Server,
+  },
+  {
+    id: "admin-models",
+    label: "Gateway Models",
+    href: "/settings/admin/models",
+    icon: Database,
+  },
+  {
+    id: "admin",
+    label: "System Admin",
+    href: "/settings/admin",
+    icon: ShieldAlert,
+  },
+];
 
 function SettingsLayout({
   children,
@@ -114,65 +130,80 @@ function SettingsLayout({
   isAdmin: boolean;
 }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const sidebarItems = isAdmin
-    ? [...baseSidebarItems, adminSidebarItem]
+  const allItems = isAdmin
+    ? [...baseSidebarItems, ...adminSidebarItems]
     : baseSidebarItems;
-  const activeItem = sidebarItems.find((item) => item.href === pathname);
+  const activeItem = allItems.find((item) => item.href === pathname);
+
+  const renderItem = (item: (typeof baseSidebarItems)[number]) => {
+    const isActive = pathname === item.href;
+    return (
+      <li key={item.id}>
+        <Link
+          href={item.href}
+          onClick={() => setMobileSidebarOpen(false)}
+          className={cn(
+            "flex w-full items-center gap-3 rounded-md px-4 py-2 text-left text-sm transition-colors",
+            isActive
+              ? "bg-muted text-foreground"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+          )}
+        >
+          <item.icon className="h-4 w-4" />
+          {item.label}
+        </Link>
+      </li>
+    );
+  };
 
   const navItems = (
-    <ul className="space-y-1">
-      {sidebarItems.map((item) => {
-        const isActive = pathname === item.href;
-        return (
-          <li key={item.id}>
-            <Link
-              href={item.href}
-              onClick={() => setMobileSidebarOpen(false)}
-              className={cn(
-                "flex w-full items-center gap-3 rounded-md px-4 py-2 text-left text-sm transition-colors",
-                isActive
-                  ? "bg-muted text-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              <item.icon className="h-4 w-4" />
-              {item.label}
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
+    <>
+      <div className="mb-2 px-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        Settings
+      </div>
+      <ul className="space-y-1">{baseSidebarItems.map(renderItem)}</ul>
+      {isAdmin && (
+        <>
+          <div className="mb-2 mt-4 px-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Administration
+          </div>
+          <ul className="space-y-1">{adminSidebarItems.map(renderItem)}</ul>
+        </>
+      )}
+    </>
+  );
+
+  const sidebarContent = (
+    <>
+      <div className="flex items-center gap-4 px-6 py-4">
+        <Link
+          href="/sessions"
+          onClick={() => setMobileSidebarOpen(false)}
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Link>
+      </div>
+      <nav className="flex-1 px-2 py-2">{navItems}</nav>
+      <div className="border-t border-border px-2 py-3">
+        <button
+          type="button"
+          onClick={signOut}
+          className="flex w-full items-center gap-3 rounded-md px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <LogOut className="h-4 w-4" />
+          Sign out
+        </button>
+      </div>
+    </>
   );
 
   return (
     <div className="flex h-screen bg-background text-foreground">
       <aside className="hidden w-64 shrink-0 border-r border-border md:flex">
         <div className="flex h-full w-full flex-col overflow-y-auto">
-          <div className="flex items-center gap-4 px-6 py-4">
-            <Link
-              href="/sessions"
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Link>
-          </div>
-          <nav className="flex-1 px-2 py-2">
-            <div className="mb-2 px-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Settings
-            </div>
-            {navItems}
-          </nav>
-          <div className="border-t border-border px-2 py-3">
-            <button
-              type="button"
-              onClick={signOut}
-              className="flex w-full items-center gap-3 rounded-md px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <LogOut className="h-4 w-4" />
-              Sign out
-            </button>
-          </div>
+          {sidebarContent}
         </div>
       </aside>
 
@@ -181,32 +212,7 @@ function SettingsLayout({
           <SheetHeader className="sr-only">
             <SheetTitle>Settings navigation</SheetTitle>
           </SheetHeader>
-          <div className="flex items-center gap-4 px-6 py-4">
-            <Link
-              href="/sessions"
-              onClick={() => setMobileSidebarOpen(false)}
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Link>
-          </div>
-          <nav className="flex-1 px-2 py-2">
-            <div className="mb-2 px-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Settings
-            </div>
-            {navItems}
-          </nav>
-          <div className="border-t border-border px-2 py-3">
-            <button
-              type="button"
-              onClick={signOut}
-              className="flex w-full items-center gap-3 rounded-md px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <LogOut className="h-4 w-4" />
-              Sign out
-            </button>
-          </div>
+          {sidebarContent}
         </SheetContent>
       </Sheet>
 
@@ -234,7 +240,9 @@ function SettingsLayout({
 export default function Layout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isAdmin } = useSession();
-  const activeItem = baseSidebarItems.find((item) => item.href === pathname);
+  const activeItem = [...baseSidebarItems, ...adminSidebarItems].find(
+    (item) => item.href === pathname,
+  );
   const fallbackTitle = activeItem?.label ?? "Profile";
   const fallbackContent =
     activeItem?.id === "connections" ? (

@@ -10,7 +10,10 @@ import {
   getShareByIdCached,
 } from "@/lib/db/sessions-cache";
 import { getUserPreferences } from "@/lib/db/user-preferences";
-import { getAllVariants, MODEL_VARIANT_ID_PREFIX } from "@/lib/model-variants";
+import {
+  getAllVariantsAsync,
+  MODEL_VARIANT_ID_PREFIX,
+} from "@/lib/model-variants";
 import { getServerSession } from "@/lib/session/get-server-session";
 import { redactSharedEnvContent } from "./redact-shared-env-content";
 import { SharedChatContent } from "./shared-chat-content";
@@ -30,7 +33,7 @@ async function resolveSharedModelName(
 
   try {
     const preferences = await getUserPreferences(userId);
-    const variant = getAllVariants(preferences.modelVariants).find(
+    const variant = (await getAllVariantsAsync(preferences.modelVariants)).find(
       (item) => item.id === modelId,
     );
 

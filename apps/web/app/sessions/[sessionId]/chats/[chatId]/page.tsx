@@ -24,7 +24,7 @@ import {
   isManagedTemplateTrialUser,
   MANAGED_TEMPLATE_TRIAL_CODE_EDITOR_ERROR,
 } from "@/lib/managed-template-trial";
-import { getAllVariants } from "@/lib/model-variants";
+import { getAllVariantsAsync } from "@/lib/model-variants";
 import { fetchAvailableLanguageModelsWithContext } from "@/lib/models-with-context";
 import { getServerSession } from "@/lib/session/get-server-session";
 import { getInitialIsOnlyChatInSession } from "./only-chat-in-session";
@@ -170,13 +170,13 @@ export default async function SessionChatPage({
   )
     ? MANAGED_TEMPLATE_TRIAL_CODE_EDITOR_ERROR
     : null;
-  const preferences = sanitizeUserPreferencesForSession(
+  const preferences = await sanitizeUserPreferencesForSession(
     rawPreferences,
     session,
     requestHost,
   );
   const modelVariants = filterModelVariantsForSession(
-    getAllVariants(preferences.modelVariants),
+    await getAllVariantsAsync(preferences.modelVariants),
     session,
     requestHost,
   );

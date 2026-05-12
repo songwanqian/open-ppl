@@ -17,12 +17,24 @@ export async function userExists(userId: string): Promise<boolean> {
 
 /**
  * Check if a user has admin privileges.
+ * Checks both the database isAdmin flag and the SYSTEM_MANAGER_EMAILS env var.
  */
 export async function isUserAdmin(userId: string): Promise<boolean> {
   const result = await db
-    .select({ isAdmin: users.isAdmin })
+    .select({ isAdmin: users.isAdmin, email: users.email })
     .from(users)
     .where(eq(users.id, userId))
     .limit(1);
-  return result[0]?.isAdmin === true;
+
+  if (result.length === 0) return false;
+  if (result[0].isAdmin) return true;
+
+  const managerEmails = process.env.SYSTEM_MANAGER_EMAILS;
+  if (managerEmails && result[0].email) {
+    const emailList = managerEmails
+      .split(",")
+      .map((e) => e.trim().toLowerCase());
+    return emailList.includes(result[0].email.toLowerCase());
+  }
+  return false;
 }

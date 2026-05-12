@@ -47,14 +47,14 @@ import {
   sanitizeSelectedModelIdForSession,
   sanitizeUserPreferencesForSession,
 } from "@/lib/model-access";
-import { getAllVariants } from "@/lib/model-variants";
+import { getAllVariantsAsync } from "@/lib/model-variants";
 import { APP_DEFAULT_MODEL_ID } from "@/lib/models";
 import type { Session as AuthSession } from "@/lib/session/types";
 import type {
   WorkflowRunStatus,
   WorkflowRunStepTiming,
 } from "@/lib/db/workflow-runs";
-import { resolveChatModelSelection } from "../api/chat/_lib/model-selection";
+import { resolveChatModelSelectionWithGateway } from "../api/chat/_lib/model-selection";
 import { resolveChatSandboxRuntime } from "./chat-sandbox-runtime";
 
 type AuthSessionContext = Pick<AuthSession, "authProvider" | "user"> | null;
@@ -167,14 +167,14 @@ async function resolveChatModelRuntime(params: {
   }
 
   const preferences = rawPreferences
-    ? sanitizeUserPreferencesForSession(
+    ? await sanitizeUserPreferencesForSession(
         rawPreferences,
         params.authSession,
         params.requestUrl,
       )
     : null;
   const modelVariants = filterModelVariantsForSession(
-    getAllVariants(preferences?.modelVariants ?? []),
+    await getAllVariantsAsync(preferences?.modelVariants ?? []),
     params.authSession,
     params.requestUrl,
   );
@@ -187,13 +187,13 @@ async function resolveChatModelRuntime(params: {
     ) ??
     chat.modelId ??
     null;
-  const mainModelSelection = resolveChatModelSelection({
+  const mainModelSelection = await resolveChatModelSelectionWithGateway({
     selectedModelId,
     modelVariants,
     missingVariantLabel: "Selected model variant",
   });
   const subagentModelSelection = preferences?.defaultSubagentModelId
-    ? resolveChatModelSelection({
+    ? await resolveChatModelSelectionWithGateway({
         selectedModelId: sanitizeSelectedModelIdForSession(
           preferences.defaultSubagentModelId,
           modelVariants,

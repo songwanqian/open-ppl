@@ -2,7 +2,7 @@ import type { SandboxState } from "@open-agents/sandbox";
 import { stepCountIs, ToolLoopAgent, type ToolSet } from "ai";
 import { z } from "zod";
 import { addCacheControl } from "./context-management";
-import { gateway } from "./models";
+import { gateway, type GatewayConfig } from "./models";
 
 import type { SkillMetadata } from "./skills/types";
 import { buildSystemPrompt } from "./system-prompt";
@@ -22,6 +22,7 @@ import {
 
 export interface AgentModelSelection {
   id: string;
+  gatewayConfig?: GatewayConfig;
 }
 
 export type OpenAgentModelInput = string | AgentModelSelection;
@@ -98,9 +99,13 @@ export const openAgent = new ToolLoopAgent({
       ? normalizeAgentModelSelection(options.subagentModel, defaultModelLabel)
       : undefined;
 
-    const callModel = gateway(mainSelection.id);
+    const callModel = gateway(mainSelection.id, {
+      config: mainSelection.gatewayConfig,
+    });
     const subagentModel = subagentSelection
-      ? gateway(subagentSelection.id)
+      ? gateway(subagentSelection.id, {
+          config: subagentSelection.gatewayConfig,
+        })
       : undefined;
     const customInstructions = options.customInstructions;
     const sandbox = options.sandbox;

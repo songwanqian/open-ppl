@@ -1,6 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
+import { getEnabledGatewayModels } from "./db/gateway-models";
 import { filterDisabledModels } from "./model-availability";
 import type {
   AvailableModel,
@@ -218,24 +219,60 @@ async function fetchGitHubModelsCatalog(): Promise<GatewayModel[]> {
   }));
 }
 
+interface GatewayModelsResult {
+  models: AvailableModel[];
+  fromGateway: boolean;
+}
+
+async function fetchAvailableLanguageModelsInternal(): Promise<GatewayModelsResult> {
+  let gatewayModelsData: Awaited<ReturnType<typeof getEnabledGatewayModels>> =
+    [];
+  try {
+    gatewayModelsData = await getEnabledGatewayModels();
+  } catch {
+    // DB unavailable -- fall back to GitHub Models catalog
+  }
+
+  if (gatewayModelsData.length > 0) {
+    return {
+      fromGateway: true,
+      models: gatewayModelsData.map((model) => ({
+        id: model.modelId,
+        name: model.name,
+        description: model.description ?? null,
+        modelType: "language" as const,
+        ...(model.contextWindow ? { context_window: model.contextWindow } : {}),
+      })),
+    };
+  }
+
+  const models = await fetchGitHubModelsCatalog();
+  return {
+    fromGateway: false,
+    models: filterDisabledModels(
+      models.filter((model) => model.modelType === "language"),
+    ),
+  };
+}
+
 export async function fetchAvailableLanguageModels(): Promise<
   AvailableModel[]
 > {
-  const models = await fetchGitHubModelsCatalog();
-  return filterDisabledModels(
-    models.filter((model) => model.modelType === "language"),
-  );
+  const result = await fetchAvailableLanguageModelsInternal();
+  return result.models;
 }
 
 export async function fetchAvailableLanguageModelsWithContext(): Promise<
   AvailableModel[]
 > {
-  const [models, modelsDevMetadataMap] = await Promise.all([
-    fetchAvailableLanguageModels(),
-    fetchModelsDevMetadataMap(),
-  ]);
+  const result = await fetchAvailableLanguageModelsInternal();
 
-  return models.map((model) =>
+  if (result.fromGateway) {
+    return result.models;
+  }
+
+  const modelsDevMetadataMap = await fetchModelsDevMetadataMap();
+  return result.models.map((model) =>
     addModelsDevMetadata(model, modelsDevMetadataMap),
   );
 }

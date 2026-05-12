@@ -2,7 +2,7 @@ import type { UserPreferencesData } from "@/lib/db/user-preferences";
 import { isManagedTemplateTrialUser } from "@/lib/managed-template-trial";
 import { APP_DEFAULT_MODEL_ID } from "@/lib/models";
 import {
-  getAllVariants,
+  getAllVariantsAsync,
   MODEL_VARIANT_ID_PREFIX,
   type ModelVariant,
 } from "@/lib/model-variants";
@@ -92,11 +92,11 @@ export function sanitizeSelectedModelIdForSession(
   return modelId;
 }
 
-export function sanitizeUserPreferencesForSession(
+export async function sanitizeUserPreferencesForSession(
   preferences: UserPreferencesData,
   session: SessionLike,
   url: string | URL,
-): UserPreferencesData {
+): Promise<UserPreferencesData> {
   if (!hasManagedTemplateModelRestrictions(session, url)) {
     return preferences;
   }
@@ -107,7 +107,7 @@ export function sanitizeUserPreferencesForSession(
     url,
   );
   const availableModelVariants = filterModelVariantsForSession(
-    getAllVariants(filteredModelVariants),
+    await getAllVariantsAsync(filteredModelVariants),
     session,
     url,
   );

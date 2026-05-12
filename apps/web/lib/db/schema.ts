@@ -397,3 +397,64 @@ export const usageEvents = pgTable("usage_events", {
 
 export type UsageEvent = typeof usageEvents.$inferSelect;
 export type NewUsageEvent = typeof usageEvents.$inferInsert;
+
+// Gateway accounts — upstream model provider accounts
+export const gatewayAccounts = pgTable("gateway_accounts", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  provider: text("provider").notNull(),
+  baseURL: text("base_url").notNull(),
+  apiKey: text("api_key"),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type GatewayAccount = typeof gatewayAccounts.$inferSelect;
+export type NewGatewayAccount = typeof gatewayAccounts.$inferInsert;
+
+// Gateway models — available model configurations
+export const gatewayModels = pgTable(
+  "gateway_models",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    modelId: text("model_id").notNull(),
+    gatewayAccountId: text("gateway_account_id")
+      .notNull()
+      .references(() => gatewayAccounts.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").notNull().default(true),
+    description: text("description"),
+    contextWindow: integer("context_window"),
+    isDefault: boolean("is_default").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [index("gateway_models_account_idx").on(table.gatewayAccountId)],
+);
+
+export type GatewayModel = typeof gatewayModels.$inferSelect;
+export type NewGatewayModel = typeof gatewayModels.$inferInsert;
+
+// Gateway model variants — admin-configured built-in model variants
+export const gatewayModelVariants = pgTable(
+  "gateway_model_variants",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    baseModelId: text("base_model_id").notNull(),
+    providerOptions: jsonb("provider_options")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("gateway_model_variants_base_model_idx").on(table.baseModelId),
+  ],
+);
+
+export type GatewayModelVariant = typeof gatewayModelVariants.$inferSelect;
+export type NewGatewayModelVariant = typeof gatewayModelVariants.$inferInsert;

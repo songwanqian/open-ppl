@@ -49,7 +49,7 @@ export default async function SessionLayout({
       getChatSummariesBySessionId(sessionId, session.user.id),
       getUserPreferences(session.user.id),
     ]);
-    const preferences = sanitizeUserPreferencesForSession(
+    const preferences = await sanitizeUserPreferencesForSession(
       rawPreferences,
       session,
       requestHost,

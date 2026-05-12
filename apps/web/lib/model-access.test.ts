@@ -95,8 +95,8 @@ describe("model access gating", () => {
     expect(result).toBe("openai/gpt-5.4");
   });
 
-  test("sanitizes managed trial preferences without mutating the database shape", () => {
-    const result = sanitizeUserPreferencesForSession(
+  test("sanitizes managed trial preferences without mutating the database shape", async () => {
+    const result = await sanitizeUserPreferencesForSession(
       basePreferences,
       managedTrialSession,
       requestUrl,
@@ -110,8 +110,8 @@ describe("model access gating", () => {
     });
   });
 
-  test("leaves Vercel users unchanged", () => {
-    const result = sanitizeUserPreferencesForSession(
+  test("leaves Vercel users unchanged", async () => {
+    const result = await sanitizeUserPreferencesForSession(
       basePreferences,
       vercelSession,
       requestUrl,

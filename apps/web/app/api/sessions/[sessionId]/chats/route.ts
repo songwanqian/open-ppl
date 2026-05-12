@@ -37,7 +37,7 @@ export async function GET(req: Request, context: RouteContext) {
     getChatSummariesBySessionId(sessionId, authResult.userId),
     getUserPreferences(authResult.userId),
   ]);
-  const preferences = sanitizeUserPreferencesForSession(
+  const preferences = await sanitizeUserPreferencesForSession(
     rawPreferences,
     session,
     req.url,
@@ -90,7 +90,7 @@ export async function POST(req: Request, context: RouteContext) {
     }
   }
 
-  const preferences = sanitizeUserPreferencesForSession(
+  const preferences = await sanitizeUserPreferencesForSession(
     await getUserPreferences(authResult.userId),
     session,
     req.url,

@@ -365,7 +365,7 @@ export async function POST(req: Request) {
       titlePromise,
       preferencesPromise,
     ]);
-    const preferences = sanitizeUserPreferencesForSession(
+    const preferences = await sanitizeUserPreferencesForSession(
       rawPreferences,
       session,
       req.url,
