@@ -43,7 +43,14 @@ interface ModelComboboxProps {
 }
 
 /** Providers pinned to the top. */
-const PRIORITY_PROVIDERS = ["anthropic", "openai"];
+const PRIORITY_PROVIDERS = [
+  "anthropic",
+  "openai",
+  "openai-responses",
+  "openai-compatible",
+  "gemini",
+  "google",
+];
 
 function groupByProvider(items: ModelComboboxItem[]) {
   const groups: Record<string, ModelComboboxItem[]> = {};

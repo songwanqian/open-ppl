@@ -1,6 +1,8 @@
 import { getGatewayAccountById } from "@/lib/db/gateway-accounts";
 import { getServerSession } from "@/lib/session/get-server-session";
 import { isUserAdmin } from "@/lib/db/users";
+import { fetchRemoteGatewayModels } from "@/lib/gateway-remote-models";
+import { normalizeGatewayProvider } from "@/lib/gateway-providers";
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -12,11 +14,6 @@ async function requireAdmin() {
     return { error: "Forbidden", status: 403 };
   }
   return { userId: session.user.id };
-}
-
-interface RemoteModel {
-  id: string;
-  name: string;
 }
 
 export async function GET(
@@ -34,61 +31,21 @@ export async function GET(
     return Response.json({ error: "Account not found" }, { status: 404 });
   }
 
-  const modelsUrl = account.baseURL.replace(/\/+$/, "") + "/models";
+  const provider = normalizeGatewayProvider(account.provider);
+  if (!provider) {
+    return Response.json(
+      { error: `Unsupported provider: ${account.provider}` },
+      { status: 400 },
+    );
+  }
 
   try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (account.apiKey) {
-      headers["Authorization"] = `Bearer ${account.apiKey}`;
-    }
-
-    const response = await fetch(modelsUrl, {
-      method: "GET",
-      headers,
-      signal: AbortSignal.timeout(10_000),
+    const models = await fetchRemoteGatewayModels({
+      provider,
+      baseURL: account.baseURL,
+      apiKey: account.apiKey,
+      modelFilter: account.modelFilter,
     });
-
-    if (!response.ok) {
-      return Response.json(
-        { error: `Failed to fetch models: HTTP ${response.status}` },
-        { status: 502 },
-      );
-    }
-
-    const data: unknown = await response.json();
-    const rawModels: unknown[] = Array.isArray(data)
-      ? data
-      : typeof data === "object" && data !== null && "data" in data
-        ? (data as { data: unknown[] }).data
-        : [];
-
-    let models: RemoteModel[] = rawModels
-      .filter(
-        (m): m is Record<string, unknown> =>
-          typeof m === "object" && m !== null,
-      )
-      .map((m) => ({
-        id: typeof m.id === "string" ? m.id : String(m.id ?? ""),
-        name:
-          typeof m.name === "string"
-            ? m.name
-            : typeof m.id === "string"
-              ? m.id
-              : "",
-      }))
-      .filter((m) => m.id);
-
-    if (account.modelFilter) {
-      try {
-        const regex = new RegExp(account.modelFilter, "i");
-        models = models.filter((m) => regex.test(m.id) || regex.test(m.name));
-      } catch {
-        // Invalid regex — skip filtering
-      }
-    }
-
     return Response.json({ models });
   } catch (err) {
     const message =

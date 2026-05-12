@@ -219,6 +219,9 @@ function DefaultProviderIcon(props: IconProps) {
 export type ProviderId =
   | "anthropic"
   | "openai"
+  | "openai-compatible"
+  | "openai-responses"
+  | "gemini"
   | "google"
   | "xai"
   | "groq"
@@ -236,6 +239,9 @@ export type ProviderId =
 const providerIconMap: Record<string, React.FC<IconProps>> = {
   anthropic: AnthropicIcon,
   openai: OpenAIIcon,
+  "openai-compatible": OpenAIIcon,
+  "openai-responses": OpenAIIcon,
+  gemini: GoogleIcon,
   google: GoogleIcon,
   xai: XAIIcon,
   groq: GroqIcon,
@@ -251,6 +257,9 @@ const providerIconMap: Record<string, React.FC<IconProps>> = {
 const providerDisplayNames: Record<string, string> = {
   anthropic: "Anthropic",
   openai: "OpenAI",
+  "openai-compatible": "OpenAI Compatible",
+  "openai-responses": "OpenAI Responses",
+  gemini: "Gemini",
   google: "Google",
   xai: "xAI",
   groq: "Groq",
@@ -268,6 +277,7 @@ const providerDisplayNames: Record<string, string> = {
 /** Prefixes in model display names that match the provider brand (stripped in compact UI). */
 const providerLabelPrefixes: Record<string, string[]> = {
   anthropic: ["Claude"],
+  gemini: ["Gemini"],
   google: ["Gemini"],
   xai: ["Grok"],
   mistral: ["Mistral"],

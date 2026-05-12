@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "catalog:",
+    "@ai-sdk/google": "catalog:",
     "@ai-sdk/openai": "catalog:",
+    "@ai-sdk/openai-compatible": "catalog:",
     "@open-agents/sandbox": "workspace:*",
     "ai": "catalog:",
     "zod": "catalog:"

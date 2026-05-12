@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { getServerSession } from "@/lib/session/get-server-session";
 import { isUserAdmin } from "@/lib/db/users";
+import { fetchRemoteGatewayModels } from "@/lib/gateway-remote-models";
+import { gatewayProviderSchema } from "@/lib/gateway-providers";
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -15,6 +17,7 @@ async function requireAdmin() {
 }
 
 const testSchema = z.object({
+  provider: gatewayProviderSchema,
   baseURL: z.string().trim().min(1),
   apiKey: z.string().optional(),
 });
@@ -37,46 +40,21 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  const { baseURL, apiKey } = parsed.data;
-  const modelsUrl = baseURL.replace(/\/+$/, "") + "/models";
+  const { provider, baseURL, apiKey } = parsed.data;
 
   const start = performance.now();
   try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (apiKey) {
-      headers["Authorization"] = `Bearer ${apiKey}`;
-    }
-
-    const response = await fetch(modelsUrl, {
-      method: "GET",
-      headers,
-      signal: AbortSignal.timeout(10_000),
+    const models = await fetchRemoteGatewayModels({
+      provider,
+      baseURL,
+      apiKey,
     });
-
     const latency = Math.round(performance.now() - start);
-
-    if (!response.ok) {
-      return Response.json({
-        success: false,
-        latency,
-        error: `HTTP ${response.status}: ${response.statusText}`,
-      });
-    }
-
-    const data: unknown = await response.json();
-    const modelsArray = Array.isArray(data)
-      ? data
-      : typeof data === "object" && data !== null && "data" in data
-        ? (data as { data: unknown }).data
-        : [];
-    const modelCount = Array.isArray(modelsArray) ? modelsArray.length : 0;
 
     return Response.json({
       success: true,
       latency,
-      modelCount,
+      modelCount: models.length,
     });
   } catch (err) {
     const latency = Math.round(performance.now() - start);

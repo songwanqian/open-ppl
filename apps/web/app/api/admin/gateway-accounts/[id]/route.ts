@@ -6,6 +6,7 @@ import {
 } from "@/lib/db/gateway-accounts";
 import { getServerSession } from "@/lib/session/get-server-session";
 import { isUserAdmin } from "@/lib/db/users";
+import { gatewayProviderSchema } from "@/lib/gateway-providers";
 
 async function requireAdmin() {
   const session = await getServerSession();
@@ -21,7 +22,7 @@ async function requireAdmin() {
 
 const updateSchema = z.object({
   name: z.string().trim().min(1).optional(),
-  provider: z.string().trim().min(1).optional(),
+  provider: gatewayProviderSchema.optional(),
   baseURL: z.string().trim().min(1).optional(),
   apiKey: z.string().nullable().optional(),
   modelFilter: z.string().nullable().optional(),

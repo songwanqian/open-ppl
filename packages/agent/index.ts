@@ -1,4 +1,11 @@
-export { type GatewayConfig, type GatewayOptions, gateway } from "./models";
+export {
+  GATEWAY_PROVIDER_IDS,
+  type GatewayConfig,
+  type GatewayOptions,
+  type GatewayProviderId,
+  gateway,
+  parseGatewayProviderId,
+} from "./models";
 export type { LanguageModel } from "./models";
 export type {
   AgentModelSelection,

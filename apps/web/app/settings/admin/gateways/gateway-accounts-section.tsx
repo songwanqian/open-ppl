@@ -33,6 +33,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  GATEWAY_PROVIDER_PRESETS,
+  isGatewayProviderId,
+  normalizeGatewayProvider,
+} from "@/lib/gateway-providers";
 import { fetcher } from "@/lib/swr";
 
 interface GatewayAccount {
@@ -62,27 +67,6 @@ interface RemoteModelsResponse {
 
 const EMPTY_ACCOUNTS: GatewayAccount[] = [];
 
-const PROVIDER_PRESETS = [
-  {
-    label: "OpenAI Compatible",
-    value: "openai-compatible",
-    baseURL: "",
-  },
-  {
-    label: "Anthropic",
-    value: "anthropic",
-    baseURL: "https://api.anthropic.com/v1",
-  },
-  {
-    label: "Google Gemini",
-    value: "google-gemini",
-    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
-  },
-  { label: "Azure OpenAI", value: "azure-openai", baseURL: "" },
-  { label: "AWS Bedrock", value: "aws-bedrock", baseURL: "" },
-  { label: "Custom", value: "custom", baseURL: "" },
-];
-
 type ConnectionTestResult = {
   success: boolean;
   latency: number;
@@ -105,7 +89,6 @@ export function GatewayAccountsSection() {
   const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState("");
   const [provider, setProvider] = useState("openai-compatible");
-  const [customProvider, setCustomProvider] = useState("");
   const [baseURL, setBaseURL] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [modelFilter, setModelFilter] = useState("");
@@ -129,7 +112,6 @@ export function GatewayAccountsSection() {
   const resetForm = useCallback(() => {
     setName("");
     setProvider("openai-compatible");
-    setCustomProvider("");
     setBaseURL("");
     setApiKey("");
     setModelFilter("");
@@ -141,16 +123,10 @@ export function GatewayAccountsSection() {
     if (dialogOpen) {
       if (editingAccount) {
         setName(editingAccount.name);
-        const preset = PROVIDER_PRESETS.find(
-          (p) => p.value === editingAccount.provider,
+        setProvider(
+          normalizeGatewayProvider(editingAccount.provider) ??
+            editingAccount.provider,
         );
-        if (preset) {
-          setProvider(editingAccount.provider);
-          setCustomProvider("");
-        } else {
-          setProvider("custom");
-          setCustomProvider(editingAccount.provider);
-        }
         setBaseURL(editingAccount.baseURL);
         setApiKey("");
         setModelFilter(editingAccount.modelFilter ?? "");
@@ -175,16 +151,16 @@ export function GatewayAccountsSection() {
   const handleProviderChange = (value: string) => {
     setProvider(value);
     setTestResult(null);
-    const preset = PROVIDER_PRESETS.find((p) => p.value === value);
+    const preset = GATEWAY_PROVIDER_PRESETS.find((p) => p.value === value);
     if (preset?.baseURL && !baseURL) {
       setBaseURL(preset.baseURL);
     }
   };
 
-  const resolvedProvider = provider === "custom" ? customProvider : provider;
+  const resolvedProvider = normalizeGatewayProvider(provider);
 
   const handleTestConnection = async () => {
-    if (!baseURL.trim()) return;
+    if (!baseURL.trim() || !resolvedProvider) return;
     setIsTesting(true);
     setTestResult(null);
     try {
@@ -192,6 +168,7 @@ export function GatewayAccountsSection() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          provider: resolvedProvider,
           baseURL: baseURL.trim(),
           apiKey: apiKey || undefined,
         }),
@@ -265,7 +242,7 @@ export function GatewayAccountsSection() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !baseURL.trim() || !resolvedProvider?.trim()) return;
+    if (!name.trim() || !baseURL.trim() || !resolvedProvider) return;
 
     setIsSaving(true);
     try {
@@ -507,33 +484,20 @@ export function GatewayAccountsSection() {
                     <SelectValue placeholder="Select provider" />
                   </SelectTrigger>
                   <SelectContent>
-                    {PROVIDER_PRESETS.map((preset) => (
+                    {GATEWAY_PROVIDER_PRESETS.map((preset) => (
                       <SelectItem key={preset.value} value={preset.value}>
                         {preset.label}
                       </SelectItem>
                     ))}
+                    {!isGatewayProviderId(provider) && (
+                      <SelectItem value={provider} disabled>
+                        Unsupported: {provider}
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
             </div>
-
-            {provider === "custom" && (
-              <div className="grid gap-1.5">
-                <Label
-                  htmlFor="gw-custom-provider"
-                  className="text-xs font-medium"
-                >
-                  Custom Provider Name
-                </Label>
-                <Input
-                  id="gw-custom-provider"
-                  value={customProvider}
-                  onChange={(e) => setCustomProvider(e.target.value)}
-                  placeholder="e.g. my-provider"
-                  disabled={isSaving}
-                />
-              </div>
-            )}
 
             <div className="grid gap-1.5">
               <Label htmlFor="gw-baseurl" className="text-xs font-medium">
@@ -580,7 +544,7 @@ export function GatewayAccountsSection() {
                 variant="outline"
                 size="sm"
                 onClick={handleTestConnection}
-                disabled={isTesting || !baseURL.trim()}
+                disabled={isTesting || !baseURL.trim() || !resolvedProvider}
               >
                 {isTesting ? (
                   <Loader2 className="size-3.5 animate-spin" />
@@ -653,7 +617,11 @@ export function GatewayAccountsSection() {
               >
                 Cancel
               </Button>
-              <Button type="submit" size="sm" disabled={isSaving}>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={isSaving || !resolvedProvider}
+              >
                 {isSaving ? <Loader2 className="size-4 animate-spin" /> : null}
                 {isSaving
                   ? "Saving..."
