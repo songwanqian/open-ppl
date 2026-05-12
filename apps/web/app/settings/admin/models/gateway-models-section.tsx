@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,9 +23,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { fetcher } from "@/lib/swr";
 
 interface GatewayAccount {
+  id: string;
+  name: string;
+  baseURL: string;
+  apiKey: string | null;
+  modelFilter: string | null;
+}
+
+interface RemoteModel {
   id: string;
   name: string;
 }
@@ -34,6 +47,7 @@ interface GatewayModel {
   id: string;
   name: string;
   modelId: string;
+  remoteModelId: string | null;
   gatewayAccountId: string;
   enabled: boolean;
   description: string | null;
@@ -76,17 +90,24 @@ export function GatewayModelsSection() {
   const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState("");
   const [modelId, setModelId] = useState("");
+  const [remoteModelId, setRemoteModelId] = useState("");
   const [gatewayAccountId, setGatewayAccountId] = useState("");
   const [enabled, setEnabled] = useState(true);
   const [description, setDescription] = useState("");
   const [contextWindow, setContextWindow] = useState("");
   const [isDefault, setIsDefault] = useState(false);
 
+  // Remote model fetcher state
+  const [remoteModelsPopoverOpen, setRemoteModelsPopoverOpen] = useState(false);
+  const [isLoadingRemote, setIsLoadingRemote] = useState(false);
+  const [remoteModels, setRemoteModels] = useState<RemoteModel[]>([]);
+
   useEffect(() => {
     if (dialogOpen) {
       if (editingModel) {
         setName(editingModel.name);
         setModelId(editingModel.modelId);
+        setRemoteModelId(editingModel.remoteModelId ?? "");
         setGatewayAccountId(editingModel.gatewayAccountId);
         setEnabled(editingModel.enabled);
         setDescription(editingModel.description ?? "");
@@ -95,6 +116,7 @@ export function GatewayModelsSection() {
       } else {
         setName("");
         setModelId("");
+        setRemoteModelId("");
         setGatewayAccountId(accounts[0]?.id ?? "");
         setEnabled(true);
         setDescription("");
@@ -114,6 +136,40 @@ export function GatewayModelsSection() {
     setDialogOpen(true);
   };
 
+  const handleFetchRemoteModels = async () => {
+    if (!gatewayAccountId) return;
+    setIsLoadingRemote(true);
+    setRemoteModelsPopoverOpen(true);
+    try {
+      const response = await fetch(
+        `/api/admin/gateway-accounts/${gatewayAccountId}/remote-models`,
+      );
+      const data = (await response.json()) as {
+        models?: RemoteModel[];
+        error?: string;
+      };
+      if (data.error) {
+        toast.error(data.error);
+        setRemoteModels([]);
+      } else {
+        setRemoteModels(data.models ?? []);
+      }
+    } catch {
+      toast.error("Failed to fetch remote models");
+      setRemoteModels([]);
+    } finally {
+      setIsLoadingRemote(false);
+    }
+  };
+
+  const handleSelectRemoteModel = (model: RemoteModel) => {
+    setRemoteModelId(model.id);
+    if (!name) {
+      setName(model.name || model.id);
+    }
+    setRemoteModelsPopoverOpen(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !modelId.trim() || !gatewayAccountId) return;
@@ -127,6 +183,7 @@ export function GatewayModelsSection() {
       const body = {
         name: name.trim(),
         modelId: modelId.trim(),
+        remoteModelId: remoteModelId.trim() || null,
         gatewayAccountId,
         enabled,
         description: description.trim() || null,
@@ -243,6 +300,10 @@ export function GatewayModelsSection() {
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {model.modelId}
+                    {model.remoteModelId &&
+                    model.remoteModelId !== model.modelId
+                      ? ` → ${model.remoteModelId}`
+                      : ""}
                     {model.contextWindow
                       ? ` · ${Math.round(model.contextWindow / 1000)}k context`
                       : ""}
@@ -278,8 +339,9 @@ export function GatewayModelsSection() {
         </div>
       </div>
 
+      {/* Model Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {editingModel ? "Edit Model" : "New Model"}
@@ -291,76 +353,154 @@ export function GatewayModelsSection() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid gap-1.5">
-              <Label htmlFor="gm-name" className="text-xs font-medium">
-                Display Name
-              </Label>
-              <Input
-                id="gm-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Claude Sonnet 4"
-                disabled={isSaving}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-1.5">
+                <Label htmlFor="gm-name" className="text-xs font-medium">
+                  Display Name
+                </Label>
+                <Input
+                  id="gm-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Claude Sonnet 4"
+                  disabled={isSaving}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="gm-account" className="text-xs font-medium">
+                  Gateway Account
+                </Label>
+                <Select
+                  value={gatewayAccountId}
+                  onValueChange={setGatewayAccountId}
+                  disabled={isSaving}
+                >
+                  <SelectTrigger id="gm-account">
+                    <SelectValue placeholder="Select account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="gm-modelid" className="text-xs font-medium">
-                Model ID
-              </Label>
-              <Input
-                id="gm-modelid"
-                value={modelId}
-                onChange={(e) => setModelId(e.target.value)}
-                placeholder="e.g. anthropic/claude-sonnet-4"
-                disabled={isSaving}
-              />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-1.5">
+                <Label htmlFor="gm-modelid" className="text-xs font-medium">
+                  System Model ID
+                </Label>
+                <Input
+                  id="gm-modelid"
+                  value={modelId}
+                  onChange={(e) => setModelId(e.target.value)}
+                  placeholder="e.g. anthropic/claude-sonnet-4.5"
+                  disabled={isSaving}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Used internally for model matching, format: provider/model
+                </p>
+              </div>
+              <div className="grid gap-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="gm-remoteid" className="text-xs font-medium">
+                    Remote Model ID
+                  </Label>
+                  {gatewayAccountId && (
+                    <Popover
+                      open={remoteModelsPopoverOpen}
+                      onOpenChange={setRemoteModelsPopoverOpen}
+                    >
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-auto gap-1 px-1 py-0 text-[11px] text-muted-foreground"
+                          onClick={handleFetchRemoteModels}
+                        >
+                          Fetch from gateway
+                          <ChevronDown className="size-3" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 p-0" align="end">
+                        <div className="max-h-64 overflow-y-auto">
+                          {isLoadingRemote ? (
+                            <div className="flex items-center justify-center py-6">
+                              <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                            </div>
+                          ) : remoteModels.length === 0 ? (
+                            <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+                              No models found
+                            </div>
+                          ) : (
+                            remoteModels.map((model) => (
+                              <button
+                                key={model.id}
+                                type="button"
+                                className="flex w-full flex-col gap-0.5 px-3 py-2 text-left hover:bg-muted/50"
+                                onClick={() => handleSelectRemoteModel(model)}
+                              >
+                                <span className="truncate text-sm">
+                                  {model.name || model.id}
+                                </span>
+                                <span className="truncate text-xs text-muted-foreground">
+                                  {model.id}
+                                </span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
+                <Input
+                  id="gm-remoteid"
+                  value={remoteModelId}
+                  onChange={(e) => setRemoteModelId(e.target.value)}
+                  placeholder="e.g. claude-sonnet-4-20250514"
+                  disabled={isSaving}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Actual ID sent to gateway API. Leave empty to use System Model
+                  ID.
+                </p>
+              </div>
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="gm-account" className="text-xs font-medium">
-                Gateway Account
-              </Label>
-              <Select
-                value={gatewayAccountId}
-                onValueChange={setGatewayAccountId}
-                disabled={isSaving}
-              >
-                <SelectTrigger id="gm-account">
-                  <SelectValue placeholder="Select account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-1.5">
+                <Label htmlFor="gm-desc" className="text-xs font-medium">
+                  Description
+                </Label>
+                <Input
+                  id="gm-desc"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Optional description"
+                  disabled={isSaving}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="gm-ctx" className="text-xs font-medium">
+                  Context Window
+                </Label>
+                <Input
+                  id="gm-ctx"
+                  type="number"
+                  value={contextWindow}
+                  onChange={(e) => setContextWindow(e.target.value)}
+                  placeholder="e.g. 200000"
+                  disabled={isSaving}
+                />
+              </div>
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="gm-desc" className="text-xs font-medium">
-                Description
-              </Label>
-              <Input
-                id="gm-desc"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Optional description"
-                disabled={isSaving}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="gm-ctx" className="text-xs font-medium">
-                Context Window
-              </Label>
-              <Input
-                id="gm-ctx"
-                type="number"
-                value={contextWindow}
-                onChange={(e) => setContextWindow(e.target.value)}
-                placeholder="e.g. 200000"
-                disabled={isSaving}
-              />
-            </div>
+
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Switch
@@ -385,6 +525,7 @@ export function GatewayModelsSection() {
                 </Label>
               </div>
             </div>
+
             <DialogFooter className="gap-2 pt-2">
               <Button
                 type="button"

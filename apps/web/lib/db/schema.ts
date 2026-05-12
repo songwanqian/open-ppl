@@ -405,6 +405,7 @@ export const gatewayAccounts = pgTable("gateway_accounts", {
   provider: text("provider").notNull(),
   baseURL: text("base_url").notNull(),
   apiKey: text("api_key"),
+  modelFilter: text("model_filter"),
   enabled: boolean("enabled").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -420,6 +421,7 @@ export const gatewayModels = pgTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     modelId: text("model_id").notNull(),
+    remoteModelId: text("remote_model_id"),
     gatewayAccountId: text("gateway_account_id")
       .notNull()
       .references(() => gatewayAccounts.id, { onDelete: "cascade" }),

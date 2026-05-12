@@ -22,6 +22,7 @@ async function requireAdmin() {
 const updateSchema = z.object({
   name: z.string().trim().min(1).optional(),
   modelId: z.string().trim().min(1).optional(),
+  remoteModelId: z.string().trim().min(1).nullable().optional(),
   gatewayAccountId: z.string().trim().min(1).optional(),
   enabled: z.boolean().optional(),
   description: z.string().nullable().optional(),

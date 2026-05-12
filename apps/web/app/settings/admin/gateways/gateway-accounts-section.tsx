@@ -1,8 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import useSWR from "swr";
-import { Eye, EyeOff, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +26,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { fetcher } from "@/lib/swr";
 
 interface GatewayAccount {
@@ -24,16 +41,54 @@ interface GatewayAccount {
   provider: string;
   baseURL: string;
   apiKey: string | null;
+  modelFilter: string | null;
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+interface RemoteModel {
+  id: string;
+  name: string;
 }
 
 interface AccountsResponse {
   accounts: GatewayAccount[];
 }
 
+interface RemoteModelsResponse {
+  models: RemoteModel[];
+}
+
 const EMPTY_ACCOUNTS: GatewayAccount[] = [];
+
+const PROVIDER_PRESETS = [
+  {
+    label: "OpenAI Compatible",
+    value: "openai-compatible",
+    baseURL: "",
+  },
+  {
+    label: "Anthropic",
+    value: "anthropic",
+    baseURL: "https://api.anthropic.com/v1",
+  },
+  {
+    label: "Google Gemini",
+    value: "google-gemini",
+    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
+  },
+  { label: "Azure OpenAI", value: "azure-openai", baseURL: "" },
+  { label: "AWS Bedrock", value: "aws-bedrock", baseURL: "" },
+  { label: "Custom", value: "custom", baseURL: "" },
+];
+
+type ConnectionTestResult = {
+  success: boolean;
+  latency: number;
+  modelCount?: number;
+  error?: string;
+} | null;
 
 export function GatewayAccountsSection() {
   const { data, isLoading, mutate } = useSWR<AccountsResponse>(
@@ -42,6 +97,7 @@ export function GatewayAccountsSection() {
   );
   const accounts = data?.accounts ?? EMPTY_ACCOUNTS;
 
+  // Account form dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<GatewayAccount | null>(
     null,
@@ -49,28 +105,62 @@ export function GatewayAccountsSection() {
   const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState("");
   const [provider, setProvider] = useState("openai-compatible");
+  const [customProvider, setCustomProvider] = useState("");
   const [baseURL, setBaseURL] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [modelFilter, setModelFilter] = useState("");
   const [enabled, setEnabled] = useState(true);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
+
+  // Connection test state
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<ConnectionTestResult>(null);
+
+  // Remote models dialog state
+  const [remoteModelsOpen, setRemoteModelsOpen] = useState(false);
+  const [viewingAccountId, setViewingAccountId] = useState<string | null>(null);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [remoteModels, setRemoteModels] = useState<RemoteModel[]>([]);
+  const [selectedRemoteModels, setSelectedRemoteModels] = useState<Set<string>>(
+    new Set(),
+  );
+  const [isImporting, setIsImporting] = useState(false);
+
+  const resetForm = useCallback(() => {
+    setName("");
+    setProvider("openai-compatible");
+    setCustomProvider("");
+    setBaseURL("");
+    setApiKey("");
+    setModelFilter("");
+    setEnabled(true);
+    setTestResult(null);
+  }, []);
 
   useEffect(() => {
     if (dialogOpen) {
       if (editingAccount) {
         setName(editingAccount.name);
-        setProvider(editingAccount.provider);
+        const preset = PROVIDER_PRESETS.find(
+          (p) => p.value === editingAccount.provider,
+        );
+        if (preset) {
+          setProvider(editingAccount.provider);
+          setCustomProvider("");
+        } else {
+          setProvider("custom");
+          setCustomProvider(editingAccount.provider);
+        }
         setBaseURL(editingAccount.baseURL);
         setApiKey("");
+        setModelFilter(editingAccount.modelFilter ?? "");
         setEnabled(editingAccount.enabled);
       } else {
-        setName("");
-        setProvider("openai-compatible");
-        setBaseURL("");
-        setApiKey("");
-        setEnabled(true);
+        resetForm();
       }
+      setTestResult(null);
     }
-  }, [dialogOpen, editingAccount]);
+  }, [dialogOpen, editingAccount, resetForm]);
 
   const handleOpenCreate = () => {
     setEditingAccount(null);
@@ -82,9 +172,100 @@ export function GatewayAccountsSection() {
     setDialogOpen(true);
   };
 
+  const handleProviderChange = (value: string) => {
+    setProvider(value);
+    setTestResult(null);
+    const preset = PROVIDER_PRESETS.find((p) => p.value === value);
+    if (preset?.baseURL && !baseURL) {
+      setBaseURL(preset.baseURL);
+    }
+  };
+
+  const resolvedProvider = provider === "custom" ? customProvider : provider;
+
+  const handleTestConnection = async () => {
+    if (!baseURL.trim()) return;
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+      const response = await fetch("/api/admin/gateway-accounts/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          baseURL: baseURL.trim(),
+          apiKey: apiKey || undefined,
+        }),
+      });
+      const result = (await response.json()) as ConnectionTestResult &
+        Record<string, unknown>;
+      setTestResult(result as ConnectionTestResult);
+    } catch {
+      setTestResult({
+        success: false,
+        latency: 0,
+        error: "Network error",
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const handleViewModels = async (account: GatewayAccount) => {
+    setViewingAccountId(account.id);
+    setIsLoadingModels(true);
+    setRemoteModelsOpen(true);
+    setSelectedRemoteModels(new Set());
+    try {
+      const response = await fetch(
+        `/api/admin/gateway-accounts/${account.id}/remote-models`,
+      );
+      const data = (await response.json()) as RemoteModelsResponse;
+      setRemoteModels(data.models ?? []);
+    } catch {
+      toast.error("Failed to fetch remote models");
+      setRemoteModels([]);
+    } finally {
+      setIsLoadingModels(false);
+    }
+  };
+
+  const handleImportModels = async () => {
+    if (!viewingAccountId || selectedRemoteModels.size === 0) return;
+    setIsImporting(true);
+    try {
+      const imports = Array.from(selectedRemoteModels).map((modelId) => {
+        const model = remoteModels.find((m) => m.id === modelId);
+        return {
+          name: model?.name || modelId,
+          modelId,
+          remoteModelId: modelId,
+          gatewayAccountId: viewingAccountId,
+        };
+      });
+      const response = await fetch("/api/admin/gateway-models/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imports }),
+      });
+      const result = (await response.json()) as {
+        created: number;
+        failed: number;
+      };
+      toast.success(
+        `Imported ${result.created} models${result.failed > 0 ? `, ${result.failed} failed` : ""}`,
+      );
+      setRemoteModelsOpen(false);
+      mutate();
+    } catch {
+      toast.error("Failed to import models");
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !baseURL.trim()) return;
+    if (!name.trim() || !baseURL.trim() || !resolvedProvider?.trim()) return;
 
     setIsSaving(true);
     try {
@@ -95,16 +276,18 @@ export function GatewayAccountsSection() {
       const body = editingAccount
         ? {
             name: name.trim(),
-            provider,
+            provider: resolvedProvider,
             baseURL: baseURL.trim(),
             ...(apiKey ? { apiKey } : {}),
+            modelFilter: modelFilter.trim() || null,
             enabled,
           }
         : {
             name: name.trim(),
-            provider,
+            provider: resolvedProvider,
             baseURL: baseURL.trim(),
             apiKey: apiKey || undefined,
+            modelFilter: modelFilter.trim() || null,
             enabled,
           };
 
@@ -238,9 +421,27 @@ export function GatewayAccountsSection() {
                         "Not set"
                       )}
                     </span>
+                    {account.modelFilter && (
+                      <>
+                        <span className="text-muted-foreground/40">·</span>
+                        <span className="truncate">
+                          Filter: /{account.modelFilter}/
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    onClick={() => handleViewModels(account)}
+                    className="size-7"
+                    title="View & import remote models"
+                  >
+                    <ChevronRight className="size-3.5" />
+                  </Button>
                   <Button
                     type="button"
                     size="icon-sm"
@@ -266,8 +467,9 @@ export function GatewayAccountsSection() {
         </div>
       </div>
 
+      {/* Account Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {editingAccount ? "Edit Gateway Account" : "New Gateway Account"}
@@ -279,30 +481,60 @@ export function GatewayAccountsSection() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid gap-1.5">
-              <Label htmlFor="gw-name" className="text-xs font-medium">
-                Name
-              </Label>
-              <Input
-                id="gw-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. GitHub Models"
-                disabled={isSaving}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-1.5">
+                <Label htmlFor="gw-name" className="text-xs font-medium">
+                  Name
+                </Label>
+                <Input
+                  id="gw-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. GitHub Models"
+                  disabled={isSaving}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="gw-provider" className="text-xs font-medium">
+                  Provider
+                </Label>
+                <Select
+                  value={provider}
+                  onValueChange={handleProviderChange}
+                  disabled={isSaving}
+                >
+                  <SelectTrigger id="gw-provider">
+                    <SelectValue placeholder="Select provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROVIDER_PRESETS.map((preset) => (
+                      <SelectItem key={preset.value} value={preset.value}>
+                        {preset.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="gw-provider" className="text-xs font-medium">
-                Provider
-              </Label>
-              <Input
-                id="gw-provider"
-                value={provider}
-                onChange={(e) => setProvider(e.target.value)}
-                placeholder="openai-compatible"
-                disabled={isSaving}
-              />
-            </div>
+
+            {provider === "custom" && (
+              <div className="grid gap-1.5">
+                <Label
+                  htmlFor="gw-custom-provider"
+                  className="text-xs font-medium"
+                >
+                  Custom Provider Name
+                </Label>
+                <Input
+                  id="gw-custom-provider"
+                  value={customProvider}
+                  onChange={(e) => setCustomProvider(e.target.value)}
+                  placeholder="e.g. my-provider"
+                  disabled={isSaving}
+                />
+              </div>
+            )}
+
             <div className="grid gap-1.5">
               <Label htmlFor="gw-baseurl" className="text-xs font-medium">
                 Base URL
@@ -310,11 +542,15 @@ export function GatewayAccountsSection() {
               <Input
                 id="gw-baseurl"
                 value={baseURL}
-                onChange={(e) => setBaseURL(e.target.value)}
+                onChange={(e) => {
+                  setBaseURL(e.target.value);
+                  setTestResult(null);
+                }}
                 placeholder="https://api.example.com/v1"
                 disabled={isSaving}
               />
             </div>
+
             <div className="grid gap-1.5">
               <Label htmlFor="gw-apikey" className="text-xs font-medium">
                 API Key{" "}
@@ -328,11 +564,73 @@ export function GatewayAccountsSection() {
                 id="gw-apikey"
                 type="password"
                 value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
+                onChange={(e) => {
+                  setApiKey(e.target.value);
+                  setTestResult(null);
+                }}
                 placeholder="sk-..."
                 disabled={isSaving}
               />
             </div>
+
+            {/* Test Connection */}
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleTestConnection}
+                disabled={isTesting || !baseURL.trim()}
+              >
+                {isTesting ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : null}
+                {isTesting ? "Testing..." : "Test Connection"}
+              </Button>
+              {testResult && (
+                <div className="flex items-center gap-1.5 text-xs">
+                  {testResult.success ? (
+                    <>
+                      <CheckCircle2 className="size-3.5 text-green-500" />
+                      <span className="text-green-600">
+                        Connected ({testResult.latency}ms)
+                        {testResult.modelCount !== undefined
+                          ? ` · ${testResult.modelCount} models found`
+                          : ""}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="size-3.5 text-red-500" />
+                      <span className="text-red-600">
+                        Failed: {testResult.error}
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label htmlFor="gw-filter" className="text-xs font-medium">
+                Model Filter{" "}
+                <span className="font-normal text-muted-foreground">
+                  (regex, optional)
+                </span>
+              </Label>
+              <Input
+                id="gw-filter"
+                value={modelFilter}
+                onChange={(e) => setModelFilter(e.target.value)}
+                placeholder="e.g. gpt-4|claude"
+                disabled={isSaving}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Regular expression to filter remote models. Only matching models
+                will appear when importing.
+              </p>
+            </div>
+
             <div className="flex items-center gap-2">
               <Switch
                 id="gw-enabled"
@@ -344,6 +642,7 @@ export function GatewayAccountsSection() {
                 Enabled
               </Label>
             </div>
+
             <DialogFooter className="gap-2 pt-2">
               <Button
                 type="button"
@@ -364,6 +663,112 @@ export function GatewayAccountsSection() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remote Models Import Dialog */}
+      <Dialog open={remoteModelsOpen} onOpenChange={setRemoteModelsOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Remote Models</DialogTitle>
+            <DialogDescription>
+              Select models to import from{" "}
+              {accounts.find((a) => a.id === viewingAccountId)?.name ??
+                "this account"}
+              .
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-96 overflow-y-auto">
+            {isLoadingModels ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : remoteModels.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                No models found.
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 px-1 pb-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 text-xs text-muted-foreground"
+                    onClick={() => {
+                      if (selectedRemoteModels.size === remoteModels.length) {
+                        setSelectedRemoteModels(new Set());
+                      } else {
+                        setSelectedRemoteModels(
+                          new Set(remoteModels.map((m) => m.id)),
+                        );
+                      }
+                    }}
+                  >
+                    {selectedRemoteModels.size === remoteModels.length
+                      ? "Deselect all"
+                      : "Select all"}
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    {selectedRemoteModels.size} of {remoteModels.length}{" "}
+                    selected
+                  </span>
+                </div>
+                {remoteModels.map((model) => (
+                  <label
+                    key={model.id}
+                    aria-label={`Select ${model.name || model.id}`}
+                    className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 hover:bg-muted/50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedRemoteModels.has(model.id)}
+                      onChange={() => {
+                        setSelectedRemoteModels((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(model.id)) {
+                            next.delete(model.id);
+                          } else {
+                            next.add(model.id);
+                          }
+                          return next;
+                        });
+                      }}
+                      className="size-3.5 rounded border-border"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm">{model.name}</div>
+                      <div className="truncate text-xs text-muted-foreground">
+                        {model.id}
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setRemoteModelsOpen(false)}
+              disabled={isImporting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={isImporting || selectedRemoteModels.size === 0}
+              onClick={handleImportModels}
+            >
+              {isImporting ? <Loader2 className="size-4 animate-spin" /> : null}
+              {isImporting
+                ? "Importing..."
+                : `Import ${selectedRemoteModels.size} Model${selectedRemoteModels.size !== 1 ? "s" : ""}`}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

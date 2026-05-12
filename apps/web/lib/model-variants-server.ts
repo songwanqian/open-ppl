@@ -1,7 +1,4 @@
-import {
-  BUILT_IN_VARIANTS,
-  type ModelVariant,
-} from "@/lib/model-variants";
+import { BUILT_IN_VARIANTS, type ModelVariant } from "@/lib/model-variants";
 import {
   getEnabledGatewayModelVariants,
   toModelVariant,

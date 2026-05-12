@@ -58,6 +58,7 @@ async function resolveGatewayConfig(
   return {
     baseURL: account.baseURL,
     apiKey: account.apiKey ?? "",
+    remoteModelId: gatewayModel.remoteModelId ?? undefined,
   };
 }
 

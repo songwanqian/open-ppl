@@ -4,6 +4,7 @@ import type { LanguageModel } from "ai";
 export interface GatewayConfig {
   baseURL: string;
   apiKey: string;
+  remoteModelId?: string;
 }
 
 export interface GatewayOptions {
@@ -20,11 +21,12 @@ export function gateway(
   options: GatewayOptions = {},
 ): LanguageModel {
   if (options.config) {
+    const actualModelId = options.config.remoteModelId ?? modelId;
     const customProvider = createOpenAI({
       baseURL: options.config.baseURL,
       apiKey: options.config.apiKey,
     });
-    return customProvider(modelId);
+    return customProvider(actualModelId);
   }
 
   return githubProvider.chat(modelId);

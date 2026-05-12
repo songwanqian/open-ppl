@@ -260,6 +260,13 @@
       "when": 1778578411324,
       "tag": "0036_far_phalanx",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1778584219228,
+      "tag": "0037_smart_piledriver",
+      "breakpoints": true
     }
   ]
 }

@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import useSWR from "swr";
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,6 +52,35 @@ interface VariantsResponse {
 const EMPTY_MODELS: GatewayModel[] = [];
 const EMPTY_VARIANTS: GatewayModelVariant[] = [];
 
+const COMMON_OPTIONS = [
+  { key: "temperature", label: "Temperature", min: 0, max: 2, step: 0.1 },
+  { key: "maxTokens", label: "Max Tokens", min: 1, max: 1000000, step: 1 },
+  { key: "topP", label: "Top P", min: 0, max: 1, step: 0.1 },
+] as const;
+
+function parseNumericOption(
+  options: Record<string, unknown>,
+  key: string,
+): string {
+  const val = options[key];
+  if (typeof val === "number") return val.toString();
+  return "";
+}
+
+function updateOption(text: string, key: string, value: unknown): string {
+  try {
+    const obj = JSON.parse(text || "{}");
+    if (value === "" || value === undefined || value === null) {
+      delete obj[key];
+    } else {
+      obj[key] = value;
+    }
+    return JSON.stringify(obj, null, 2);
+  } catch {
+    return text;
+  }
+}
+
 export function GatewayModelVariantsSection() {
   const { data: modelsData } = useSWR<ModelsResponse>(
     "/api/admin/gateway-models",
@@ -67,11 +103,24 @@ export function GatewayModelVariantsSection() {
   const [baseModelId, setBaseModelId] = useState("");
   const [providerOptionsText, setProviderOptionsText] = useState("{}");
   const [enabled, setEnabled] = useState(true);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const modelNameById = models.reduce<Record<string, string>>((acc, m) => {
     acc[m.modelId] = m.name;
     return acc;
   }, {});
+
+  const parsedOptions: Record<string, unknown> = (() => {
+    try {
+      return JSON.parse(providerOptionsText || "{}");
+    } catch {
+      return {};
+    }
+  })();
+
+  const hasAdvancedOptions = Object.keys(parsedOptions).some(
+    (key) => !COMMON_OPTIONS.some((opt) => opt.key === key),
+  );
 
   useEffect(() => {
     if (dialogOpen) {
@@ -88,6 +137,7 @@ export function GatewayModelVariantsSection() {
         setProviderOptionsText("{}");
         setEnabled(true);
       }
+      setShowAdvanced(false);
     }
   }, [dialogOpen, editingVariant, models]);
 
@@ -101,13 +151,22 @@ export function GatewayModelVariantsSection() {
     setDialogOpen(true);
   };
 
+  const handleCommonOptionChange = (key: string, value: string) => {
+    const numVal = value === "" ? undefined : parseFloat(value);
+    const newOptions =
+      numVal !== undefined && !isNaN(numVal)
+        ? updateOption(providerOptionsText, key, numVal)
+        : updateOption(providerOptionsText, key, undefined);
+    setProviderOptionsText(newOptions);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !baseModelId) return;
 
-    let parsedOptions: Record<string, unknown>;
+    let parsedOpts: Record<string, unknown>;
     try {
-      parsedOptions = JSON.parse(providerOptionsText || "{}");
+      parsedOpts = JSON.parse(providerOptionsText || "{}");
     } catch {
       toast.error("Provider options must be valid JSON");
       return;
@@ -122,7 +181,7 @@ export function GatewayModelVariantsSection() {
       const body = {
         name: name.trim(),
         baseModelId,
-        providerOptions: parsedOptions,
+        providerOptions: parsedOpts,
         enabled,
       };
 
@@ -261,8 +320,9 @@ export function GatewayModelVariantsSection() {
         </div>
       </div>
 
+      {/* Variant Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {editingVariant
@@ -276,50 +336,126 @@ export function GatewayModelVariantsSection() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid gap-1.5">
-              <Label htmlFor="bv-name" className="text-xs font-medium">
-                Name
-              </Label>
-              <Input
-                id="bv-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Claude Adaptive Thinking"
-                disabled={isSaving}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-1.5">
+                <Label htmlFor="bv-name" className="text-xs font-medium">
+                  Name
+                </Label>
+                <Input
+                  id="bv-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Claude Adaptive Thinking"
+                  disabled={isSaving}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="bv-model" className="text-xs font-medium">
+                  Base Model
+                </Label>
+                <select
+                  id="bv-model"
+                  value={baseModelId}
+                  onChange={(e) => setBaseModelId(e.target.value)}
+                  disabled={isSaving}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="">Select a model</option>
+                  {models.map((model) => (
+                    <option key={model.id} value={model.modelId}>
+                      {model.name} ({model.modelId})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="bv-model" className="text-xs font-medium">
-                Base Model
-              </Label>
-              <select
-                id="bv-model"
-                value={baseModelId}
-                onChange={(e) => setBaseModelId(e.target.value)}
-                disabled={isSaving}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="">Select a model</option>
-                {models.map((model) => (
-                  <option key={model.id} value={model.modelId}>
-                    {model.name} ({model.modelId})
-                  </option>
+
+            {/* Common Options */}
+            <div className="space-y-3">
+              <Label className="text-xs font-medium">Provider Options</Label>
+              <div className="grid grid-cols-3 gap-3">
+                {COMMON_OPTIONS.map((opt) => (
+                  <div key={opt.key} className="grid gap-1">
+                    <Label
+                      htmlFor={`bv-${opt.key}`}
+                      className="text-[11px] text-muted-foreground"
+                    >
+                      {opt.label}
+                    </Label>
+                    {opt.key === "maxTokens" ? (
+                      <Input
+                        id={`bv-${opt.key}`}
+                        type="number"
+                        min={opt.min}
+                        max={opt.max}
+                        step={opt.step}
+                        value={parseNumericOption(parsedOptions, opt.key)}
+                        onChange={(e) =>
+                          handleCommonOptionChange(opt.key, e.target.value)
+                        }
+                        placeholder="—"
+                        disabled={isSaving}
+                        className="h-8 text-xs"
+                      />
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="range"
+                          min={opt.min}
+                          max={opt.max}
+                          step={opt.step}
+                          value={
+                            parseNumericOption(parsedOptions, opt.key) ||
+                            opt.min
+                          }
+                          onChange={(e) =>
+                            handleCommonOptionChange(opt.key, e.target.value)
+                          }
+                          disabled={isSaving}
+                          className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-muted accent-primary"
+                        />
+                        <span className="w-8 text-right text-[11px] tabular-nums text-muted-foreground">
+                          {parseNumericOption(parsedOptions, opt.key) || "—"}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 ))}
-              </select>
+              </div>
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="bv-options" className="text-xs font-medium">
-                Provider Options
-              </Label>
-              <Textarea
-                id="bv-options"
-                value={providerOptionsText}
-                onChange={(e) => setProviderOptionsText(e.target.value)}
-                className="min-h-24 resize-y rounded-md border-border bg-muted/30 font-mono text-xs leading-relaxed"
-                placeholder='{"reasoningEffort": "medium"}'
-                disabled={isSaving}
-              />
+
+            {/* Advanced JSON Editor */}
+            <div className="space-y-1.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-auto gap-1 px-0 py-0 text-[11px] text-muted-foreground hover:text-foreground"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+              >
+                {showAdvanced ? (
+                  <ChevronUp className="size-3" />
+                ) : (
+                  <ChevronDown className="size-3" />
+                )}
+                Advanced JSON Editor
+                {hasAdvancedOptions && !showAdvanced && (
+                  <span className="rounded-sm bg-amber-500/20 px-1 text-amber-600">
+                    has custom keys
+                  </span>
+                )}
+              </Button>
+              {showAdvanced && (
+                <Textarea
+                  value={providerOptionsText}
+                  onChange={(e) => setProviderOptionsText(e.target.value)}
+                  className="min-h-32 resize-y rounded-md border-border bg-muted/30 font-mono text-xs leading-relaxed"
+                  placeholder='{"reasoningEffort": "medium"}'
+                  disabled={isSaving}
+                />
+              )}
             </div>
+
             <div className="flex items-center gap-2">
               <Switch
                 id="bv-enabled"

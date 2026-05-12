@@ -23,6 +23,7 @@ const createSchema = z.object({
   provider: z.string().trim().min(1),
   baseURL: z.string().trim().min(1),
   apiKey: z.string().optional(),
+  modelFilter: z.string().optional().nullable(),
   enabled: z.boolean().optional().default(true),
 });
 
@@ -59,6 +60,7 @@ export async function POST(req: Request) {
     provider: parsed.data.provider,
     baseURL: parsed.data.baseURL,
     apiKey: parsed.data.apiKey ?? null,
+    modelFilter: parsed.data.modelFilter ?? null,
     enabled: parsed.data.enabled,
   });
   return Response.json({ account }, { status: 201 });

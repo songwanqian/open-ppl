@@ -1,8 +1,5 @@
 import { z } from "zod";
-import {
-  createGatewayModel,
-  getAllGatewayModels,
-} from "@/lib/db/gateway-models";
+import { createGatewayModel } from "@/lib/db/gateway-models";
 import { getServerSession } from "@/lib/session/get-server-session";
 import { isUserAdmin } from "@/lib/db/users";
 
@@ -18,26 +15,18 @@ async function requireAdmin() {
   return { userId: session.user.id };
 }
 
-const createSchema = z.object({
+const importItemSchema = z.object({
   name: z.string().trim().min(1),
   modelId: z.string().trim().min(1),
   remoteModelId: z.string().trim().min(1).optional().nullable(),
   gatewayAccountId: z.string().trim().min(1),
-  enabled: z.boolean().optional().default(true),
   description: z.string().optional().nullable(),
   contextWindow: z.number().int().positive().optional().nullable(),
-  isDefault: z.boolean().optional().default(false),
 });
 
-export async function GET() {
-  const auth = await requireAdmin();
-  if ("error" in auth) {
-    return Response.json({ error: auth.error }, { status: auth.status });
-  }
-
-  const models = await getAllGatewayModels();
-  return Response.json({ models });
-}
+const batchSchema = z.object({
+  imports: z.array(importItemSchema).min(1).max(100),
+});
 
 export async function POST(req: Request) {
   const auth = await requireAdmin();
@@ -52,20 +41,35 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const parsed = createSchema.safeParse(body);
+  const parsed = batchSchema.safeParse(body);
   if (!parsed.success) {
     return Response.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  const model = await createGatewayModel({
-    name: parsed.data.name,
-    modelId: parsed.data.modelId,
-    remoteModelId: parsed.data.remoteModelId ?? null,
-    gatewayAccountId: parsed.data.gatewayAccountId,
-    enabled: parsed.data.enabled,
-    description: parsed.data.description ?? null,
-    contextWindow: parsed.data.contextWindow ?? null,
-    isDefault: parsed.data.isDefault,
-  });
-  return Response.json({ model }, { status: 201 });
+  const results = [];
+  for (const item of parsed.data.imports) {
+    try {
+      const model = await createGatewayModel({
+        name: item.name,
+        modelId: item.modelId,
+        remoteModelId: item.remoteModelId ?? null,
+        gatewayAccountId: item.gatewayAccountId,
+        enabled: true,
+        description: item.description ?? null,
+        contextWindow: item.contextWindow ?? null,
+        isDefault: false,
+      });
+      results.push({ success: true, model });
+    } catch {
+      results.push({ success: false, modelId: item.modelId });
+    }
+  }
+
+  const created = results.filter((r) => r.success === true).length;
+  const failed = results.filter((r) => r.success === false).length;
+
+  return Response.json(
+    { results, created, failed },
+    { status: failed > 0 && created === 0 ? 500 : 201 },
+  );
 }

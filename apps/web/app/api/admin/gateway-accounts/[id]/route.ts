@@ -24,6 +24,7 @@ const updateSchema = z.object({
   provider: z.string().trim().min(1).optional(),
   baseURL: z.string().trim().min(1).optional(),
   apiKey: z.string().nullable().optional(),
+  modelFilter: z.string().nullable().optional(),
   enabled: z.boolean().optional(),
 });
 
