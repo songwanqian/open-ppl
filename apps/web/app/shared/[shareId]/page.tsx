@@ -10,10 +10,8 @@ import {
   getShareByIdCached,
 } from "@/lib/db/sessions-cache";
 import { getUserPreferences } from "@/lib/db/user-preferences";
-import {
-  getAllVariantsAsync,
-  MODEL_VARIANT_ID_PREFIX,
-} from "@/lib/model-variants";
+import { MODEL_VARIANT_ID_PREFIX } from "@/lib/model-variants";
+import { getAllVariantsAsync } from "@/lib/model-variants-server";
 import { getServerSession } from "@/lib/session/get-server-session";
 import { redactSharedEnvContent } from "./redact-shared-env-content";
 import { SharedChatContent } from "./shared-chat-content";

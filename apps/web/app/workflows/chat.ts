@@ -47,7 +47,7 @@ import {
   sanitizeSelectedModelIdForSession,
   sanitizeUserPreferencesForSession,
 } from "@/lib/model-access";
-import { getAllVariantsAsync } from "@/lib/model-variants";
+import { getAllVariantsAsync } from "@/lib/model-variants-server";
 import { APP_DEFAULT_MODEL_ID } from "@/lib/models";
 import type { Session as AuthSession } from "@/lib/session/types";
 import type {

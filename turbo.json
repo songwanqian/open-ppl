@@ -20,6 +20,7 @@
         "REDIS_URL",
         "VERCEL_APP_CLIENT_SECRET",
         "OPEN_AGENTS_RESOURCE_PROFILE",
+	"SYSTEM_MANAGER_EMAILS",
         "GITHUB_TOKEN"
       ],
       "outputs": ["dist/**"]

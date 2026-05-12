@@ -2,10 +2,10 @@ import type { UserPreferencesData } from "@/lib/db/user-preferences";
 import { isManagedTemplateTrialUser } from "@/lib/managed-template-trial";
 import { APP_DEFAULT_MODEL_ID } from "@/lib/models";
 import {
-  getAllVariantsAsync,
   MODEL_VARIANT_ID_PREFIX,
   type ModelVariant,
 } from "@/lib/model-variants";
+import { getAllVariantsAsync } from "@/lib/model-variants-server";
 import type { Session } from "@/lib/session/types";
 
 const RESTRICTED_MODEL_PREFIXES = ["anthropic/claude-opus-"];

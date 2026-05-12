@@ -160,36 +160,3 @@ export function isBuiltInVariant(variantId: string): boolean {
 }
 
 export const BUILT_IN_VARIANTS: ModelVariant[] = [];
-
-/**
- * Loads built-in variants from the gateway_model_variants database table.
- */
-export async function getBuiltInVariantsFromDB(): Promise<ModelVariant[]> {
-  try {
-    const { getEnabledGatewayModelVariants, toModelVariant } =
-      await import("./db/gateway-model-variants");
-    const rows = await getEnabledGatewayModelVariants();
-    return rows.map(toModelVariant);
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Combines built-in variants from the database with user-defined variants.
- * Built-in variants appear first.
- */
-export async function getAllVariantsAsync(
-  userVariants: ModelVariant[],
-): Promise<ModelVariant[]> {
-  const builtIn = await getBuiltInVariantsFromDB();
-  return [...builtIn, ...userVariants];
-}
-
-/**
- * Synchronous version that only uses hardcoded built-in variants.
- * Prefer getAllVariantsAsync when database access is available.
- */
-export function getAllVariants(userVariants: ModelVariant[]): ModelVariant[] {
-  return [...BUILT_IN_VARIANTS, ...userVariants];
-}

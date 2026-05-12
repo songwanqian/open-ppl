@@ -2,7 +2,6 @@ import { nanoid } from "nanoid";
 import {
   createModelVariantInputSchema,
   deleteModelVariantInputSchema,
-  getAllVariantsAsync,
   isBuiltInVariant,
   MODEL_VARIANT_ID_PREFIX,
   modelVariantSchema,
@@ -10,6 +9,7 @@ import {
   type JsonValue,
   updateModelVariantInputSchema,
 } from "@/lib/model-variants";
+import { getAllVariantsAsync } from "@/lib/model-variants-server";
 import {
   getUserPreferences,
   updateUserPreferences,

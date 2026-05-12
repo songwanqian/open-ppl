@@ -11,7 +11,7 @@ import {
 } from "@/lib/db/sessions";
 import { getUserPreferences } from "@/lib/db/user-preferences";
 import { sanitizeSelectedModelIdForSession } from "@/lib/model-access";
-import { getAllVariantsAsync } from "@/lib/model-variants";
+import { getAllVariantsAsync } from "@/lib/model-variants-server";
 import { getServerSession } from "@/lib/session/get-server-session";
 
 type RouteContext = {
