@@ -2,11 +2,7 @@ import type { AgentModelSelection } from "@open-agents/agent";
 import { resolveAvailableModelId } from "@/lib/model-availability";
 import { type ModelVariant, resolveModelSelection } from "@/lib/model-variants";
 import { APP_DEFAULT_MODEL_ID } from "@/lib/models";
-import {
-  getGatewayModelByModelId,
-  getEnabledGatewayModels,
-} from "@/lib/db/gateway-models";
-import { getGatewayAccountById } from "@/lib/db/gateway-accounts";
+import { resolveGatewayConfig } from "@/lib/resolve-gateway-config";
 
 interface ResolveChatModelSelectionParams {
   selectedModelId: string | null | undefined;
@@ -42,43 +38,18 @@ export function resolveChatModelSelection({
   };
 }
 
-async function resolveGatewayConfig(
-  modelId: string,
-): Promise<AgentModelSelection["gatewayConfig"]> {
-  const gatewayModel = await getGatewayModelByModelId(modelId);
-  if (!gatewayModel || !gatewayModel.enabled) {
-    return undefined;
-  }
-
-  const account = await getGatewayAccountById(gatewayModel.gatewayAccountId);
-  if (!account || !account.enabled || !account.baseURL) {
-    return undefined;
-  }
-
-  return {
-    baseURL: account.baseURL,
-    apiKey: account.apiKey ?? "",
-    remoteModelId: gatewayModel.remoteModelId ?? undefined,
-  };
-}
-
 export async function resolveChatModelSelectionWithGateway(
   params: ResolveChatModelSelectionParams,
 ): Promise<AgentModelSelection> {
   const selection = resolveChatModelSelection(params);
 
   try {
-    const gatewayModels = await getEnabledGatewayModels();
-    if (gatewayModels.length === 0) {
-      return selection;
-    }
-
     const gatewayConfig = await resolveGatewayConfig(selection.id);
     if (gatewayConfig) {
       return { ...selection, gatewayConfig };
     }
   } catch {
-    // DB unavailable -- proceed without gateway config (use default GitHub Models)
+    // DB unavailable -- proceed without gateway config
   }
 
   return selection;

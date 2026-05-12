@@ -11,9 +11,9 @@ export interface GatewayOptions {
   config?: GatewayConfig;
 }
 
-const githubProvider = createOpenAI({
-  baseURL: "https://models.github.ai/inference",
-  apiKey: process.env.GITHUB_TOKEN,
+const placeholderProvider = createOpenAI({
+  baseURL: "https://gateway-not-configured.invalid",
+  apiKey: "not-configured",
 });
 
 export function gateway(
@@ -29,7 +29,9 @@ export function gateway(
     return customProvider(actualModelId);
   }
 
-  return githubProvider.chat(modelId);
+  return placeholderProvider.chat(modelId);
 }
+
+export const DEFAULT_FAST_MODEL_ID = "anthropic/claude-haiku-4.5";
 
 export type { LanguageModel };

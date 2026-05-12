@@ -1,7 +1,7 @@
 import type { LanguageModel } from "ai";
 import { stepCountIs, ToolLoopAgent } from "ai";
 import { z } from "zod";
-import { gateway } from "../models";
+import { gateway, DEFAULT_FAST_MODEL_ID } from "../models";
 import { bashTool } from "../tools/bash";
 import { globTool } from "../tools/glob";
 import { grepTool } from "../tools/grep";
@@ -60,7 +60,7 @@ const callOptionsSchema = z.object({
 export type ExecutorCallOptions = z.infer<typeof callOptionsSchema>;
 
 export const executorSubagent = new ToolLoopAgent({
-  model: gateway("anthropic/claude-haiku-4.5"),
+  model: gateway(DEFAULT_FAST_MODEL_ID),
   instructions: EXECUTOR_SYSTEM_PROMPT,
   tools: {
     read: readFileTool(),

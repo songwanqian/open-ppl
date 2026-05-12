@@ -11,7 +11,6 @@ let generateTextResult: { text: string } | Error = {
 };
 
 mock.module("ai", () => ({
-  gateway: (modelId: string) => modelId,
   generateText: async (input: { prompt: string }) => {
     generateTextCalls.push(input);
 
@@ -21,6 +20,15 @@ mock.module("ai", () => ({
 
     return generateTextResult;
   },
+  tool: () => {},
+}));
+
+mock.module("@open-agents/agent", () => ({
+  gateway: (modelId: string) => modelId,
+}));
+
+mock.module("@/lib/resolve-gateway-config", () => ({
+  resolveGatewayConfig: async () => undefined,
 }));
 
 mock.module("@/lib/session/get-server-session", () => ({

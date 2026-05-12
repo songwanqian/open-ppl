@@ -1,5 +1,7 @@
 import { generateText } from "ai";
 import { gateway } from "@open-agents/agent";
+import { SYSTEM_FAST_MODEL_ID } from "@/lib/models";
+import { resolveGatewayConfig } from "@/lib/resolve-gateway-config";
 
 export const SAFE_BRANCH_PATTERN = /^[\w\-/.]+$/;
 
@@ -57,7 +59,9 @@ export async function generateCommitMessage(
 
   try {
     const result = await generateText({
-      model: gateway("anthropic/claude-haiku-4.5"),
+      model: gateway(SYSTEM_FAST_MODEL_ID, {
+        config: await resolveGatewayConfig(SYSTEM_FAST_MODEL_ID),
+      }),
       prompt: `Generate a concise git commit message for these changes. Use conventional commit format (e.g., "feat:", "fix:", "refactor:"). One line only, max 72 characters.
 
 Session context: ${sessionTitle}

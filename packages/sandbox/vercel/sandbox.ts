@@ -1,4 +1,5 @@
 import { Sandbox as VercelSandboxSDK } from "@vercel/sandbox";
+import { SandboxExecError } from "./sandbox-exec-error";
 import type { Dirent } from "fs";
 import type {
   ExecResult,
@@ -931,13 +932,10 @@ ${hostLine}${portLines}${runtimeEnvLine}`;
         throw error;
       }
 
-      return {
-        success: false,
-        exitCode: null,
-        stdout: "",
-        stderr: error instanceof Error ? error.message : String(error),
-        truncated: false,
-      };
+      throw new SandboxExecError(
+        error instanceof Error ? error.message : String(error),
+        { cause: error, isInfrastructure: true },
+      );
     }
   }
 

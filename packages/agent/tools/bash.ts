@@ -1,6 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import * as path from "path";
+import { SandboxExecError } from "@open-agents/sandbox";
 import { getSandbox } from "./utils";
 
 const TIMEOUT_MS = 120_000;
@@ -157,16 +158,29 @@ EXAMPLES:
         }
       }
 
-      const result = await sandbox.exec(command, workingDir, TIMEOUT_MS, {
-        signal: abortSignal,
-      });
+      try {
+        const result = await sandbox.exec(command, workingDir, TIMEOUT_MS, {
+          signal: abortSignal,
+        });
 
-      return {
-        success: result.success,
-        exitCode: result.exitCode,
-        stdout: result.stdout,
-        stderr: result.stderr,
-        ...(result.truncated && { truncated: true }),
-      };
+        return {
+          success: result.success,
+          exitCode: result.exitCode,
+          stdout: result.stdout,
+          stderr: result.stderr,
+          ...(result.truncated && { truncated: true }),
+        };
+      } catch (error) {
+        if (error instanceof SandboxExecError && error.isInfrastructure) {
+          return {
+            success: false,
+            exitCode: null,
+            stdout: "",
+            stderr: `SANDBOX_INFRASTRUCTURE_ERROR: ${error.message}`,
+            infrastructureError: true,
+          };
+        }
+        throw error;
+      }
     },
   });

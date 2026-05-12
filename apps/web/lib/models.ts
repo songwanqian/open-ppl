@@ -1,4 +1,6 @@
 export const DEFAULT_MODEL_ID = "anthropic/claude-haiku-4.5";
+export const SYSTEM_FAST_MODEL_ID =
+  process.env.SYSTEM_FAST_MODEL_ID ?? "anthropic/claude-haiku-4.5";
 export const APP_DEFAULT_MODEL_ID = "openai/gpt-5.4";
 export const DEFAULT_CONTEXT_LIMIT = 200_000;
 const TOKENS_PER_MILLION = 1_000_000;

@@ -5,6 +5,8 @@ import {
 import type { CheckRun } from "@/lib/github/pulls";
 import { getUserGitHubToken } from "@/lib/github/token";
 import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
+import { SYSTEM_FAST_MODEL_ID } from "@/lib/models";
+import { resolveGatewayConfig } from "@/lib/resolve-gateway-config";
 import { Octokit } from "@octokit/rest";
 import { gateway } from "@open-agents/agent";
 import { generateText } from "ai";
@@ -158,7 +160,9 @@ async function compactLog(rawLog: string): Promise<string> {
   }
 
   const result = await generateText({
-    model: gateway("anthropic/claude-haiku-4.5"),
+    model: gateway(SYSTEM_FAST_MODEL_ID, {
+      config: await resolveGatewayConfig(SYSTEM_FAST_MODEL_ID),
+    }),
     system: LOG_SUMMARIZATION_PROMPT,
     prompt: logInput,
   });
@@ -290,8 +294,11 @@ export async function POST(req: Request, context: RouteContext) {
         } else {
           try {
             compactedLogs[runId] = await compactLog(rawLog);
-          } catch {
-            // If the LLM call fails, fall back to raw log with basic truncation
+          } catch (error) {
+            console.error(
+              `[fix-checks] Log compaction failed for run ${runId}:`,
+              error,
+            );
             compactedLogs[runId] =
               rawLog.length > 16_000
                 ? `${rawLog.slice(0, 8000)}\n\n... (${rawLog.length - 16_000} characters omitted) ...\n\n${rawLog.slice(-8000)}`

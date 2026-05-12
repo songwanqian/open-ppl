@@ -2,7 +2,6 @@ import "server-only";
 
 import { z } from "zod";
 import { getEnabledGatewayModels } from "./db/gateway-models";
-import { filterDisabledModels } from "./model-availability";
 import type {
   AvailableModel,
   AvailableModelCost,
@@ -12,7 +11,6 @@ import type {
 
 const MODELS_DEV_URL = "https://models.dev/api.json";
 const MODELS_DEV_TIMEOUT_MS = 750;
-const GITHUB_MODELS_CATALOG_URL = "https://models.github.ai/catalog/models";
 
 type GatewayModel = GatewayAvailableModel;
 
@@ -171,108 +169,43 @@ function addModelsDevMetadata(
   return nextModel;
 }
 
-async function fetchGitHubModelsCatalog(): Promise<GatewayModel[]> {
-  const token = process.env.GITHUB_TOKEN;
-  if (!token) {
-    throw new Error(
-      "GITHUB_TOKEN environment variable is required for GitHub Models",
-    );
-  }
-
-  const response = await fetch(GITHUB_MODELS_CATALOG_URL, {
-    headers: {
-      Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${token}`,
-      "X-GitHub-Api-Version": "2025-04-01",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch GitHub Models catalog: ${response.status}`,
-    );
-  }
-
-  const data: unknown = await response.json();
-
-  const catalogSchema = z.array(
-    z
-      .object({
-        id: z.string(),
-        name: z.string().optional(),
-        description: z.string().optional(),
-        task: z.union([z.string(), z.array(z.string())]).optional(),
-      })
-      .passthrough(),
-  );
-
-  const parsed = catalogSchema.safeParse(data);
-  if (!parsed.success) {
-    throw new Error("Invalid GitHub Models catalog response");
-  }
-
-  return parsed.data.map((model) => ({
-    id: model.id,
-    name: model.name ?? model.id,
+function mapGatewayModelsFromDB(
+  gatewayModelsData: Awaited<ReturnType<typeof getEnabledGatewayModels>>,
+): GatewayModel[] {
+  return gatewayModelsData.map((model) => ({
+    id: model.modelId,
+    name: model.name,
     description: model.description ?? null,
     modelType: "language" as const,
+    ...(model.contextWindow ? { context_window: model.contextWindow } : {}),
   }));
 }
 
-interface GatewayModelsResult {
-  models: AvailableModel[];
-  fromGateway: boolean;
-}
-
-async function fetchAvailableLanguageModelsInternal(): Promise<GatewayModelsResult> {
-  let gatewayModelsData: Awaited<ReturnType<typeof getEnabledGatewayModels>> =
-    [];
+async function fetchAvailableLanguageModelsInternal(): Promise<GatewayModel[]> {
   try {
-    gatewayModelsData = await getEnabledGatewayModels();
+    const gatewayModelsData = await getEnabledGatewayModels();
+    if (gatewayModelsData.length > 0) {
+      return mapGatewayModelsFromDB(gatewayModelsData);
+    }
   } catch {
-    // DB unavailable -- fall back to GitHub Models catalog
+    // DB unavailable
   }
 
-  if (gatewayModelsData.length > 0) {
-    return {
-      fromGateway: true,
-      models: gatewayModelsData.map((model) => ({
-        id: model.modelId,
-        name: model.name,
-        description: model.description ?? null,
-        modelType: "language" as const,
-        ...(model.contextWindow ? { context_window: model.contextWindow } : {}),
-      })),
-    };
-  }
-
-  const models = await fetchGitHubModelsCatalog();
-  return {
-    fromGateway: false,
-    models: filterDisabledModels(
-      models.filter((model) => model.modelType === "language"),
-    ),
-  };
+  return [];
 }
 
 export async function fetchAvailableLanguageModels(): Promise<
   AvailableModel[]
 > {
-  const result = await fetchAvailableLanguageModelsInternal();
-  return result.models;
+  return fetchAvailableLanguageModelsInternal();
 }
 
 export async function fetchAvailableLanguageModelsWithContext(): Promise<
   AvailableModel[]
 > {
-  const result = await fetchAvailableLanguageModelsInternal();
-
-  if (result.fromGateway) {
-    return result.models;
-  }
-
+  const models = await fetchAvailableLanguageModelsInternal();
   const modelsDevMetadataMap = await fetchModelsDevMetadataMap();
-  return result.models.map((model) =>
+  return models.map((model) =>
     addModelsDevMetadata(model, modelsDevMetadataMap),
   );
 }

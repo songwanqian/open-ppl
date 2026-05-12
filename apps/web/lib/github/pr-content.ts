@@ -9,6 +9,8 @@ import { db } from "@/lib/db/client";
 import { getChatsBySessionId, getSessionById } from "@/lib/db/sessions";
 import { users } from "@/lib/db/schema";
 import { SAFE_BRANCH_PATTERN } from "@/lib/git/helpers";
+import { SYSTEM_FAST_MODEL_ID } from "@/lib/models";
+import { resolveGatewayConfig } from "@/lib/resolve-gateway-config";
 
 const prContentSchema = z.object({
   title: z
@@ -301,7 +303,9 @@ export async function generatePullRequestContentFromSandbox(
   let prContent: z.infer<typeof prContentSchema>;
   try {
     const { output } = await generateText({
-      model: gateway("anthropic/claude-haiku-4.5"),
+      model: gateway(SYSTEM_FAST_MODEL_ID, {
+        config: await resolveGatewayConfig(SYSTEM_FAST_MODEL_ID),
+      }),
       output: Output.object({
         schema: prContentSchema,
       }),
@@ -349,11 +353,16 @@ ${commitLog}`,
     }
   } catch (error) {
     if (NoObjectGeneratedError.isInstance(error)) {
+      console.warn(
+        "[pr-content] Failed to generate structured PR content:",
+        error,
+      );
       prContent = {
         title: sessionTitle,
         body: `## Changes\n\n${diffStats}\n\n## Commits\n\n${commitLog}`,
       };
     } else {
+      console.error("[pr-content] LLM call failed:", error);
       throw error;
     }
   }

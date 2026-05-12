@@ -1,7 +1,13 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import { type ModelVariant } from "@/lib/model-variants";
 import { APP_DEFAULT_MODEL_ID } from "@/lib/models";
-import { resolveChatModelSelection } from "./model-selection";
+
+mock.module("server-only", () => ({}));
+mock.module("@/lib/resolve-gateway-config", () => ({
+  resolveGatewayConfig: async () => undefined,
+}));
+
+const { resolveChatModelSelection } = await import("./model-selection");
 
 describe("resolveChatModelSelection", () => {
   test("returns direct model ids unchanged", () => {

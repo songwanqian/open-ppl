@@ -62,6 +62,19 @@ mock.module("@open-agents/sandbox", () => ({
     return sandbox;
   },
   tryConnectVercelSandboxDirect: async () => null,
+  SandboxExecError: (() => {
+    function SandboxExecError(
+      this: Error & { isInfrastructure: boolean },
+      message: string,
+      options?: { isInfrastructure?: boolean },
+    ) {
+      Error.call(this, message);
+      this.name = "SandboxExecError";
+      this.isInfrastructure = options?.isInfrastructure ?? false;
+    }
+    SandboxExecError.prototype = Object.create(Error.prototype);
+    return SandboxExecError;
+  })(),
 }));
 
 const { askUserQuestionTool } = await import("./ask-user-question");

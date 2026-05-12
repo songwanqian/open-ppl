@@ -23,14 +23,14 @@ mock.module("@ai-sdk/openai", () => ({
 const { gateway } = await import("./models");
 
 describe("gateway", () => {
-  test("delegates to github provider for standard calls", () => {
+  test("uses placeholder provider when no config is provided", () => {
     providerCalls.length = 0;
     gateway("anthropic/claude-sonnet-4.6");
 
     expect(providerCalls).toEqual([
       {
         modelId: "anthropic/claude-sonnet-4.6",
-        source: "openai:https://models.github.ai/inference:chat",
+        source: "openai:https://gateway-not-configured.invalid:chat",
       },
     ]);
   });
@@ -49,14 +49,20 @@ describe("gateway", () => {
     ]);
   });
 
-  test("passes model id unchanged to provider", () => {
+  test("uses remoteModelId from config when provided", () => {
     providerCalls.length = 0;
-    gateway("openai/gpt-5.4");
+    gateway("anthropic/claude-sonnet-4.6", {
+      config: {
+        baseURL: "https://custom.api",
+        apiKey: "sk-test",
+        remoteModelId: "claude-sonnet-4-6",
+      },
+    });
 
     expect(providerCalls).toEqual([
       {
-        modelId: "openai/gpt-5.4",
-        source: "openai:https://models.github.ai/inference:chat",
+        modelId: "claude-sonnet-4-6",
+        source: "openai:https://custom.api",
       },
     ]);
   });

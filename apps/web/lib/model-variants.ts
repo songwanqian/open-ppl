@@ -160,3 +160,7 @@ export function isBuiltInVariant(variantId: string): boolean {
 }
 
 export const BUILT_IN_VARIANTS: ModelVariant[] = [];
+
+export function getAllVariants(userVariants: ModelVariant[]): ModelVariant[] {
+  return [...BUILT_IN_VARIANTS, ...userVariants];
+}

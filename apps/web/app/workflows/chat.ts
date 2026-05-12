@@ -9,6 +9,7 @@ import {
   type UIMessageChunk,
 } from "ai";
 import type { OpenAgentCallOptions } from "@open-agents/agent";
+import { SandboxExecError } from "@open-agents/sandbox";
 import { getWorkflowMetadata, getWritable } from "workflow";
 import { getRun } from "workflow/api";
 import { assistantFileLinkPrompt } from "@/lib/assistant-file-links";
@@ -83,6 +84,8 @@ type ChatModelRuntime = {
 };
 
 type Writable = WritableStream<UIMessageChunk>;
+
+const MAX_CONSECUTIVE_INFRASTRUCTURE_ERRORS = 3;
 
 const shouldPauseForToolInteraction = (parts: WebAgentUIMessage["parts"]) =>
   parts.some(
@@ -290,6 +293,23 @@ function getSetupErrorMessage(error: unknown): string {
 
   if (error.message === "Session is archived") {
     return "This session is archived. Unarchive it to continue.";
+  }
+
+  if (error instanceof SandboxExecError && error.isInfrastructure) {
+    return "The sandbox environment is not available. Please try refreshing or starting a new session.";
+  }
+
+  const msg = error.message.toLowerCase();
+  if (msg.includes("timeout") || msg.includes("timed out")) {
+    return "The workspace took too long to respond. Please try again.";
+  }
+
+  if (
+    msg.includes("network") ||
+    msg.includes("connection") ||
+    msg.includes("econnrefused")
+  ) {
+    return "Could not connect to the workspace. Please check your connection and try again.";
   }
 
   return "Workspace setup failed. Try again in a moment.";
@@ -667,6 +687,7 @@ export async function runAgentWorkflow(options: Options) {
   let caughtError: unknown;
   let sandboxState: OpenAgentCallOptions["sandbox"]["state"] | undefined;
   let shouldRefreshCachedDiff = false;
+  let consecutiveInfrastructureErrors = 0;
 
   try {
     const [runtime, modelRuntime, modelMessages] = await Promise.all([
@@ -730,7 +751,18 @@ export async function runAgentWorkflow(options: Options) {
           agentOptions,
           step + 1,
         );
+        consecutiveInfrastructureErrors = 0;
       } catch (error) {
+        if (error instanceof SandboxExecError) {
+          consecutiveInfrastructureErrors++;
+          if (
+            consecutiveInfrastructureErrors >=
+            MAX_CONSECUTIVE_INFRASTRUCTURE_ERRORS
+          ) {
+            throw error;
+          }
+          continue;
+        }
         if (isStepTimingError(error)) {
           stepTimings.push(error.stepTiming);
         }
@@ -941,13 +973,27 @@ export async function runAgentWorkflow(options: Options) {
     workflowStatus = wasAborted ? "aborted" : "failed";
     caughtError = error;
 
-    if (pendingAssistantResponse.parts.length === 0 && !streamClosed) {
+    if (!streamClosed) {
       const errorText = getSetupErrorMessage(error);
-      pendingAssistantResponse = {
-        ...pendingAssistantResponse,
-        parts: [{ type: "text", text: errorText }],
-      };
-      await sendTextMessage(writable, "setup-error", errorText);
+
+      if (pendingAssistantResponse.parts.length === 0) {
+        pendingAssistantResponse = {
+          ...pendingAssistantResponse,
+          parts: [{ type: "text", text: errorText }],
+        };
+        await sendTextMessage(writable, "setup-error", errorText);
+      } else {
+        const errorPartId = `${pendingAssistantResponse.id}:error`;
+        pendingAssistantResponse = {
+          ...pendingAssistantResponse,
+          parts: [
+            ...pendingAssistantResponse.parts,
+            { type: "text", text: `\n\n${errorText}` },
+          ],
+        };
+        await sendTextMessage(writable, errorPartId, errorText);
+      }
+
       await persistAssistantMessage(options.chatId, pendingAssistantResponse);
     }
   } finally {

@@ -1,4 +1,5 @@
 export { VercelSandbox, connectVercelSandbox } from "./sandbox";
+export { SandboxExecError } from "./sandbox-exec-error";
 export type { VercelSandboxConfig, VercelSandboxConnectConfig } from "./config";
 export type { VercelState } from "./state";
 export { connectVercel } from "./connect";
