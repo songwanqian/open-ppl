@@ -88,7 +88,10 @@ export async function getSandbox(
     );
   }
 
-  return connectSandbox(context.sandbox.state);
+  return connectSandbox({
+    state: context.sandbox.state,
+    options: { resume: true },
+  });
 }
 
 /**
